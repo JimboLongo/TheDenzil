@@ -1,0 +1,1 @@
+ALTER TABLE "team" ALTER COLUMN "abbreviation" DROP NOT NULL;

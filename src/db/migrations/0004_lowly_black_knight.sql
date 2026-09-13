@@ -1,0 +1,1 @@
+ALTER TABLE "week_board_config" DROP COLUMN "max_games";

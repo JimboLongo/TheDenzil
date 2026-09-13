@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   pgEnum,
@@ -9,6 +10,9 @@ import {
   jsonb,
   numeric,
   unique,
+  uniqueIndex,
+  check,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 export const sportEnum = pgEnum("sport", ["NFL", "NCAA", "CFL"]);
@@ -32,17 +36,89 @@ export const weekTypeEnum = pgEnum("week_type", [
   "bowl",
   "playoff",
 ]);
+// 'upcoming' -> 'open' (publishBoardAction) -> 'settling' (auto, once
+// now > max kickoff of on-board games) -> 'final' (settlement engine,
+// Phase D). See getCurrentWeek() in src/db/weeks.ts — never resolved
+// by a timestamp heuristic.
+export const weekStatusEnum = pgEnum("week_status", [
+  "upcoming",
+  "open",
+  "settling",
+  "final",
+]);
 export const teamAliasSourceEnum = pgEnum("team_alias_source", [
   "archive",
   "odds_api",
   "manual",
 ]);
+export const gameSourceEnum = pgEnum("game_source", ["odds_api", "manual"]);
+export const boardOverrideActionEnum = pgEnum("board_override_action", [
+  "INCLUDE",
+  "EXCLUDE",
+]);
+
+// Auth.js (next-auth v5) adapter tables — column names/shapes match
+// @auth/drizzle-adapter's expected Postgres schema exactly, so this
+// schema can be passed straight into DrizzleAdapter(db, { usersTable:
+// user, ... }) while still being managed by drizzle-kit like every
+// other table. Deliberately separate from `player`: auth identity and
+// league membership are different concerns — see getCurrentPlayer(),
+// which resolves a session to a player row by email.
+export const user = pgTable("user", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email").unique(),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
+});
+
+export const account = pgTable(
+  "account",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.provider, table.providerAccountId] }),
+  ],
+);
+
+export const session = pgTable("session", {
+  sessionToken: text("sessionToken").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+export const verificationToken = pgTable(
+  "verificationToken",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.identifier, table.token] })],
+);
 
 export const team = pgTable("team", {
   id: serial("id").primaryKey(),
   sport: sportEnum("sport").notNull(),
   canonicalName: text("canonical_name").notNull(),
-  abbreviation: text("abbreviation").notNull(),
+  abbreviation: text("abbreviation"),
   isActive: boolean("is_active").notNull().default(true),
 });
 
@@ -85,27 +161,47 @@ export const seasonEntry = pgTable("season_entry", {
   role: roleEnum("role").notNull().default("player"),
 });
 
-export const week = pgTable("week", {
-  id: serial("id").primaryKey(),
-  seasonId: integer("season_id")
-    .notNull()
-    .references(() => season.id),
-  number: integer("number").notNull(),
-  type: weekTypeEnum("type").notNull(),
-  linesPublishedAt: timestamp("lines_published_at", { withTimezone: true }),
-  lineSnapshotAt: timestamp("line_snapshot_at", { withTimezone: true }),
-  isSpeedWeekForAll: boolean("is_speed_week_for_all").notNull().default(false),
-  allowsStringBetsFromWeek: integer("allows_string_bets_from_week"),
-});
+export const week = pgTable(
+  "week",
+  {
+    id: serial("id").primaryKey(),
+    seasonId: integer("season_id")
+      .notNull()
+      .references(() => season.id),
+    number: integer("number").notNull(),
+    type: weekTypeEnum("type").notNull(),
+    status: weekStatusEnum("status").notNull().default("upcoming"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    linesPublishedAt: timestamp("lines_published_at", { withTimezone: true }),
+    lineSnapshotAt: timestamp("line_snapshot_at", { withTimezone: true }),
+    isSpeedWeekForAll: boolean("is_speed_week_for_all")
+      .notNull()
+      .default(false),
+    allowsStringBetsFromWeek: integer("allows_string_bets_from_week"),
+  },
+  (t) => [
+    // Two open weeks means players can submit against the wrong one —
+    // enforced here, not just in the app, since this must hold no
+    // matter what code path writes the row.
+    uniqueIndex("week_one_open_per_season")
+      .on(t.seasonId)
+      .where(sql`${t.status} = 'open'`),
+  ],
+);
 
+// Board rule shape (documented here since jsonb carries no DB-level schema):
+//   { sport: 'NFL'|'NCAA'|'CFL', markets: ('SPREAD'|'TOTAL')[],
+//     daysOfWeek: number[] (0=Sun..6=Sat, America/New_York),
+//     includeTeamIds: number[] | null, excludeTeamIds: number[] | null }
+//   Both match on EITHER team, not both; null means no restriction.
+//   Exclude wins over include. See src/lib/board/rules.ts for the
+//   matching logic and TS types.
 export const weekBoardConfig = pgTable("week_board_config", {
   weekId: integer("week_id")
     .primaryKey()
     .references(() => week.id),
-  includedDaysOfWeek: integer("included_days_of_week").array().notNull(),
-  includedSports: sportEnum("included_sports").array().notNull(),
-  eligibleTeamIds: integer("eligible_team_ids").array(),
-  maxGames: integer("max_games"),
+  rules: jsonb("rules").notNull().default(sql`'[]'::jsonb`),
 });
 
 export const game = pgTable(
@@ -130,11 +226,34 @@ export const game = pgTable(
     homeScore: integer("home_score"),
     awayScore: integer("away_score"),
     status: gameStatusEnum("status").notNull().default("scheduled"),
+    source: gameSourceEnum("source").notNull().default("odds_api"),
     externalEventId: text("external_event_id"),
     sourceBook: text("source_book"),
     isOnBoard: boolean("is_on_board").notNull().default(false),
   },
-  (t) => [unique().on(t.externalEventId, t.market)],
+  (t) => [
+    unique().on(t.externalEventId, t.market),
+    check(
+      "game_external_event_id_source_check",
+      sql`(source = 'manual' AND external_event_id IS NULL) OR (source = 'odds_api' AND external_event_id IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const boardOverride = pgTable(
+  "board_override",
+  {
+    id: serial("id").primaryKey(),
+    weekId: integer("week_id")
+      .notNull()
+      .references(() => week.id),
+    gameId: integer("game_id")
+      .notNull()
+      .references(() => game.id),
+    action: boardOverrideActionEnum("action").notNull(),
+    note: text("note"),
+  },
+  (t) => [unique().on(t.weekId, t.gameId)],
 );
 
 export const pick = pgTable(

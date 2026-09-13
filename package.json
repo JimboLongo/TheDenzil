@@ -6,12 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:teams": "tsx scripts/seed-teams.ts",
+    "fetch:board": "tsx scripts/fetch-board.ts",
+    "seed:reset": "tsx scripts/seed-reset.ts"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.3",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.5",
+    "next-auth": "^5.0.0-beta.32",
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -25,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
