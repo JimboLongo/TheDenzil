@@ -120,6 +120,13 @@ export const team = pgTable("team", {
   canonicalName: text("canonical_name").notNull(),
   abbreviation: text("abbreviation"),
   isActive: boolean("is_active").notNull().default(true),
+  // Synthetic teams belonging to the Phase D test fixture. The team
+  // table is global, not season-scoped, so without this flag fixture
+  // teams leak into every real team picker. Scoping a picker to "teams
+  // in this season" doesn't work as an alternative: season team
+  // allowlists are set before any games exist, so that list would be
+  // empty exactly when a commissioner needs it.
+  isFixture: boolean("is_fixture").notNull().default(false),
 });
 
 export const teamAlias = pgTable("team_alias", {

@@ -1,4 +1,4 @@
-import { eq, inArray, like } from "drizzle-orm";
+import { eq, inArray, like, or } from "drizzle-orm";
 import { db } from "./index";
 import {
   game,
@@ -74,9 +74,12 @@ export async function deleteFixtureSeason(): Promise<void> {
     .returning({ id: player.id });
   console.log(`deleted ${deletedPlayers.length} fixture player(s)`);
 
+  // team.isFixture is the real marker; the name prefix is kept as a
+  // fallback so teams seeded before the column existed still get cleaned
+  // up rather than lingering invisibly.
   const deletedTeams = await db
     .delete(team)
-    .where(like(team.canonicalName, `${FIXTURE_TEAM_PREFIX}%`))
+    .where(or(eq(team.isFixture, true), like(team.canonicalName, `${FIXTURE_TEAM_PREFIX}%`)))
     .returning({ id: team.id });
   console.log(`deleted ${deletedTeams.length} fixture team(s)`);
 }

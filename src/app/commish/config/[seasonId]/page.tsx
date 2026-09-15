@@ -49,6 +49,9 @@ export default async function SeasonConfigPage({
   const allTeams = await db
     .select({ id: team.id, sport: team.sport, canonicalName: team.canonicalName })
     .from(team)
+    // The team table is global, so the Phase D fixture's synthetic teams
+    // would otherwise show up here alongside the real ones.
+    .where(eq(team.isFixture, false))
     .orderBy(asc(team.canonicalName));
 
   const nflTeams = allTeams.filter((t) => t.sport === "NFL");
@@ -94,7 +97,7 @@ export default async function SeasonConfigPage({
   });
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 1200 }}>
+    <main className="flex max-w-[1200px] flex-col gap-3 p-4 sm:p-6">
       <h1>Board Config — {seasonRow.label}</h1>
       <p>
         Season defaults for the board builder. Individual weeks can still be

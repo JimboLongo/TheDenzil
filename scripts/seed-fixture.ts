@@ -514,6 +514,7 @@ async function main() {
         sport: "NFL" as const,
         canonicalName: `Fixture NFL ${String(i + 1).padStart(2, "0")}`,
         isActive: true,
+        isFixture: true,
       })),
     )
     .returning({ id: team.id });
@@ -524,6 +525,7 @@ async function main() {
         sport: "NCAA" as const,
         canonicalName: `Fixture NCAA ${String(i + 1).padStart(2, "0")}`,
         isActive: true,
+        isFixture: true,
       })),
     )
     .returning({ id: team.id });
