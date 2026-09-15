@@ -6,9 +6,14 @@ import type { Sport } from "@/db/teams";
 
 export type Market = "SPREAD" | "TOTAL";
 
+// One rule per (sport, market) — not one rule per sport covering both
+// markets. A single sport can need different days for different
+// markets in the same week (rule 11: week 18's NFL TOTAL runs Sat+Sun
+// while NFL SPREAD stays Sun+Mon everywhere, including week 18). A
+// shared days array per sport can't represent that.
 export type BoardRule = {
   sport: Sport;
-  markets: Market[];
+  market: Market;
   daysOfWeek: number[];
   includeTeamIds: number[] | null;
   excludeTeamIds: number[] | null;
@@ -51,7 +56,7 @@ export function matchesRule(
   rule: BoardRule,
 ): boolean {
   if (rule.sport !== game.sport) return false;
-  if (!rule.markets.includes(game.market)) return false;
+  if (rule.market !== game.market) return false;
   if (!rule.daysOfWeek.includes(dayOfWeekInLeagueTime(game.kickoffAt))) {
     return false;
   }

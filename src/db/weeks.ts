@@ -1,4 +1,6 @@
 import { and, desc, eq, max } from "drizzle-orm";
+import { TOTAL_WEEKS } from "@/lib/board/grid";
+import { addCalendarDays, dayOfWeekOf, etWallTimeToUtc, type CalendarDate } from "@/lib/dates";
 import { db } from "./index";
 import { game, week } from "./schema";
 
@@ -68,4 +70,71 @@ export async function getCurrentWeek(seasonId: number): Promise<WeekRow | null> 
     .limit(1);
 
   return finalWeek ?? null;
+}
+
+export type GenerateWeeksResult = {
+  ok: boolean;
+  message: string;
+  created: number[];
+  skipped: number[];
+};
+
+/**
+ * Creates weeks 1-18 for a season: startsAt Saturday 00:00 ET, endsAt
+ * Monday 23:59 ET, type 'regular', status 'upcoming'. Never overwrites
+ * — a week number that already exists is skipped outright, same
+ * protection as the grid save has for published weeks.
+ */
+export async function generateSeasonWeeks(
+  seasonId: number,
+  firstSaturday: CalendarDate,
+): Promise<GenerateWeeksResult> {
+  if (dayOfWeekOf(firstSaturday) !== 6) {
+    return {
+      ok: false,
+      message: `${firstSaturday.year}-${String(firstSaturday.month).padStart(2, "0")}-${String(firstSaturday.day).padStart(2, "0")} is not a Saturday.`,
+      created: [],
+      skipped: [],
+    };
+  }
+
+  const existing = await db
+    .select({ number: week.number })
+    .from(week)
+    .where(eq(week.seasonId, seasonId));
+  const existingNumbers = new Set(existing.map((w) => w.number));
+
+  const created: number[] = [];
+  const skipped: number[] = [];
+
+  for (let n = 1; n <= TOTAL_WEEKS; n++) {
+    if (existingNumbers.has(n)) {
+      skipped.push(n);
+      continue;
+    }
+
+    const saturday = addCalendarDays(firstSaturday, (n - 1) * 7);
+    const monday = addCalendarDays(saturday, 2);
+
+    await db.insert(week).values({
+      seasonId,
+      number: n,
+      type: "regular",
+      status: "upcoming",
+      startsAt: etWallTimeToUtc(saturday.year, saturday.month, saturday.day, 0, 0, 0),
+      endsAt: etWallTimeToUtc(monday.year, monday.month, monday.day, 23, 59, 59),
+    });
+
+    created.push(n);
+  }
+
+  return {
+    ok: true,
+    message:
+      skipped.length > 0
+        ? `Created ${created.length} week(s), skipped ${skipped.length} (already exist).`
+        : `Created ${created.length} week(s).`,
+    created,
+    skipped,
+  };
 }

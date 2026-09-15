@@ -146,6 +146,22 @@ export const season = pgTable("season", {
   status: text("status").notNull(),
 });
 
+// Season-level board defaults: the /commish/config grid. nflTeamIds /
+// ncaaTeamIds are the season-wide team lists (null = all teams,
+// default). grid is a BoardGrid (src/lib/board/grid.ts) — 18 weeks x
+// {NFL_SPREAD, NFL_TOTAL, NCAA_SPREAD, NCAA_TOTAL}, each a day-of-week
+// array, empty meaning not included. Saving the grid writes
+// week_board_config rows per week; this table is the durable "plan"
+// that survives even for weeks that don't exist yet or are locked.
+export const seasonBoardDefaults = pgTable("season_board_defaults", {
+  seasonId: integer("season_id")
+    .primaryKey()
+    .references(() => season.id),
+  nflTeamIds: integer("nfl_team_ids").array(),
+  ncaaTeamIds: integer("ncaa_team_ids").array(),
+  grid: jsonb("grid").notNull().default(sql`'{}'::jsonb`),
+});
+
 export const seasonEntry = pgTable("season_entry", {
   id: serial("id").primaryKey(),
   seasonId: integer("season_id")
@@ -191,12 +207,14 @@ export const week = pgTable(
 );
 
 // Board rule shape (documented here since jsonb carries no DB-level schema):
-//   { sport: 'NFL'|'NCAA'|'CFL', markets: ('SPREAD'|'TOTAL')[],
+//   { sport: 'NFL'|'NCAA'|'CFL', market: 'SPREAD'|'TOTAL',
 //     daysOfWeek: number[] (0=Sun..6=Sat, America/New_York),
 //     includeTeamIds: number[] | null, excludeTeamIds: number[] | null }
-//   Both match on EITHER team, not both; null means no restriction.
-//   Exclude wins over include. See src/lib/board/rules.ts for the
-//   matching logic and TS types.
+//   One rule per (sport, market) — the same sport's two markets can run
+//   on different days in the same week (rule 11). includeTeamIds/
+//   excludeTeamIds match on EITHER team, not both; null means no
+//   restriction. Exclude wins over include. See src/lib/board/rules.ts
+//   for the matching logic and TS types.
 export const weekBoardConfig = pgTable("week_board_config", {
   weekId: integer("week_id")
     .primaryKey()

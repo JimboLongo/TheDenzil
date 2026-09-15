@@ -17,21 +17,15 @@ import { takeSnapshot } from "@/lib/odds/snapshotBoard";
 // are POST endpoints reachable directly regardless of what the UI shows.
 
 const ALL_SPORTS: Sport[] = ["NFL", "NCAA", "CFL"];
+const ALL_MARKETS: Market[] = ["SPREAD", "TOTAL"];
 
+// One rule per (sport, market) — a market is "on" purely by having a
+// non-empty day set, no separate checkbox. Include/exclude team lists
+// stay scoped per sport (shared by both its markets).
 function parseRulesFromFormData(formData: FormData): BoardRule[] {
   const rules: BoardRule[] = [];
 
   for (const sport of ALL_SPORTS) {
-    const markets: Market[] = [];
-    if (formData.get(`rule_${sport}_market_SPREAD`)) markets.push("SPREAD");
-    if (formData.get(`rule_${sport}_market_TOTAL`)) markets.push("TOTAL");
-    if (markets.length === 0) continue;
-
-    const daysOfWeek: number[] = [];
-    for (let d = 0; d < 7; d++) {
-      if (formData.get(`rule_${sport}_day_${d}`)) daysOfWeek.push(d);
-    }
-
     const hasIncludeList = Boolean(formData.get(`rule_${sport}_hasInclude`));
     const includeTeamIds = hasIncludeList
       ? formData.getAll(`rule_${sport}_includeTeamIds`).map((v) => Number(v))
@@ -42,13 +36,15 @@ function parseRulesFromFormData(formData: FormData): BoardRule[] {
       ? formData.getAll(`rule_${sport}_excludeTeamIds`).map((v) => Number(v))
       : null;
 
-    rules.push({
-      sport,
-      markets,
-      daysOfWeek,
-      includeTeamIds,
-      excludeTeamIds,
-    });
+    for (const market of ALL_MARKETS) {
+      const daysOfWeek: number[] = [];
+      for (let d = 0; d < 7; d++) {
+        if (formData.get(`rule_${sport}_${market}_day_${d}`)) daysOfWeek.push(d);
+      }
+      if (daysOfWeek.length === 0) continue;
+
+      rules.push({ sport, market, daysOfWeek, includeTeamIds, excludeTeamIds });
+    }
   }
 
   return rules;

@@ -13,6 +13,7 @@ import {
 import type { PublishResult } from "./actions";
 
 const SPORT_ORDER: Sport[] = ["NFL", "NCAA", "CFL"];
+const MARKET_ORDER: Market[] = ["SPREAD", "TOTAL"];
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const ET_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
@@ -37,8 +38,7 @@ export type GameRow = OverridableGame & {
 type TeamOption = { id: number; canonicalName: string };
 
 type SportRuleState = {
-  markets: Set<Market>;
-  days: Set<number>;
+  days: Record<Market, Set<number>>;
   hasIncludeList: boolean;
   includeTeamIds: Set<number>;
   hasExcludeList: boolean;
@@ -49,24 +49,22 @@ function initialStateFor(
   sport: Sport,
   initialRules: BoardRule[],
 ): SportRuleState {
-  const rule = initialRules.find((r) => r.sport === sport);
-  if (!rule) {
-    return {
-      markets: new Set(),
-      days: new Set(),
-      hasIncludeList: false,
-      includeTeamIds: new Set(),
-      hasExcludeList: false,
-      excludeTeamIds: new Set(),
-    };
-  }
+  const sportRules = initialRules.filter((r) => r.sport === sport);
+  const spreadRule = sportRules.find((r) => r.market === "SPREAD");
+  const totalRule = sportRules.find((r) => r.market === "TOTAL");
+  // Include/exclude lists are shared per sport — either market's rule
+  // carries the same values, so either one (if present) is authoritative.
+  const anyRule = spreadRule ?? totalRule;
+
   return {
-    markets: new Set(rule.markets),
-    days: new Set(rule.daysOfWeek),
-    hasIncludeList: rule.includeTeamIds !== null,
-    includeTeamIds: new Set(rule.includeTeamIds ?? []),
-    hasExcludeList: rule.excludeTeamIds !== null,
-    excludeTeamIds: new Set(rule.excludeTeamIds ?? []),
+    days: {
+      SPREAD: new Set(spreadRule?.daysOfWeek ?? []),
+      TOTAL: new Set(totalRule?.daysOfWeek ?? []),
+    },
+    hasIncludeList: (anyRule?.includeTeamIds ?? null) !== null,
+    includeTeamIds: new Set(anyRule?.includeTeamIds ?? []),
+    hasExcludeList: (anyRule?.excludeTeamIds ?? null) !== null,
+    excludeTeamIds: new Set(anyRule?.excludeTeamIds ?? []),
   };
 }
 
@@ -118,16 +116,22 @@ export function RulesEditor({
   const rules: BoardRule[] = useMemo(() => {
     return SPORT_ORDER.flatMap((sport) => {
       const s = ruleState[sport];
-      if (s.markets.size === 0) return [];
-      return [
-        {
-          sport,
-          markets: [...s.markets],
-          daysOfWeek: [...s.days],
-          includeTeamIds: s.hasIncludeList ? [...s.includeTeamIds] : null,
-          excludeTeamIds: s.hasExcludeList ? [...s.excludeTeamIds] : null,
-        },
-      ];
+      const includeTeamIds = s.hasIncludeList ? [...s.includeTeamIds] : null;
+      const excludeTeamIds = s.hasExcludeList ? [...s.excludeTeamIds] : null;
+
+      return MARKET_ORDER.flatMap((market) => {
+        const days = s.days[market];
+        if (days.size === 0) return [];
+        return [
+          {
+            sport,
+            market,
+            daysOfWeek: [...days],
+            includeTeamIds,
+            excludeTeamIds,
+          },
+        ];
+      });
     });
   }, [ruleState]);
 
@@ -136,21 +140,15 @@ export function RulesEditor({
     [games, rules, overridesMap],
   );
 
-  function toggleMarket(sport: Sport, market: Market) {
+  function toggleDay(sport: Sport, market: Market, day: number) {
     setRuleState((prev) => {
-      const next = new Set(prev[sport].markets);
-      if (next.has(market)) next.delete(market);
-      else next.add(market);
-      return { ...prev, [sport]: { ...prev[sport], markets: next } };
-    });
-  }
-
-  function toggleDay(sport: Sport, day: number) {
-    setRuleState((prev) => {
-      const next = new Set(prev[sport].days);
+      const next = new Set(prev[sport].days[market]);
       if (next.has(day)) next.delete(day);
       else next.add(day);
-      return { ...prev, [sport]: { ...prev[sport], days: next } };
+      return {
+        ...prev,
+        [sport]: { ...prev[sport], days: { ...prev[sport].days, [market]: next } },
+      };
     });
   }
 
@@ -214,46 +212,24 @@ export function RulesEditor({
             <fieldset key={sport} style={{ marginBottom: "1rem" }}>
               <legend>{sport}</legend>
 
-              <div>
-                <label>
-                  <input
-                    type="checkbox"
-                    name={`rule_${sport}_market_SPREAD`}
-                    checked={s.markets.has("SPREAD")}
-                    onChange={() => toggleMarket(sport, "SPREAD")}
-                  />{" "}
-                  SPREAD
-                </label>{" "}
-                <label>
-                  <input
-                    type="checkbox"
-                    name={`rule_${sport}_market_TOTAL`}
-                    checked={s.markets.has("TOTAL")}
-                    onChange={() => toggleMarket(sport, "TOTAL")}
-                  />{" "}
-                  TOTAL
-                </label>
-              </div>
-
-              <div>
-                {DAY_LABELS.map((label, day) => (
-                  <label key={day} style={{ marginRight: "0.5rem" }}>
-                    <input
-                      type="checkbox"
-                      name={`rule_${sport}_day_${day}`}
-                      checked={s.days.has(day)}
-                      onChange={() => toggleDay(sport, day)}
-                    />{" "}
-                    {label}
-                  </label>
-                ))}
-                {s.markets.size > 0 && s.days.size === 0 && (
-                  <span style={{ color: "#b00020" }}>
-                    {" "}
-                    no days selected — this rule matches nothing
-                  </span>
-                )}
-              </div>
+              {MARKET_ORDER.map((market) => (
+                <div key={market} style={{ marginBottom: "0.35rem" }}>
+                  <strong style={{ display: "inline-block", width: 60 }}>
+                    {market}
+                  </strong>{" "}
+                  {DAY_LABELS.map((label, day) => (
+                    <label key={day} style={{ marginRight: "0.5rem" }}>
+                      <input
+                        type="checkbox"
+                        name={`rule_${sport}_${market}_day_${day}`}
+                        checked={s.days[market].has(day)}
+                        onChange={() => toggleDay(sport, market, day)}
+                      />{" "}
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              ))}
 
               <div style={{ display: "flex", gap: "1.5rem", marginTop: "0.5rem" }}>
                 <div>

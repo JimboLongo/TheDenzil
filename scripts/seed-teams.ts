@@ -6,9 +6,43 @@ if (!ODDS_API_KEY) {
   throw new Error("ODDS_API_KEY is not set");
 }
 
-const SPORTS: { key: string; sport: Sport }[] = [
-  { key: "americanfootball_nfl", sport: "NFL" },
-  { key: "americanfootball_ncaaf", sport: "NCAA" },
+// Fixed list — the NFL hasn't added or moved a team since 2002. The
+// odds API's /events endpoint only returns teams with an upcoming
+// scheduled game, which silently drops whoever's on a bye at fetch
+// time (3 of 32, last time this ran). Hardcoding avoids that.
+const NFL_TEAMS = [
+  "Arizona Cardinals",
+  "Atlanta Falcons",
+  "Baltimore Ravens",
+  "Buffalo Bills",
+  "Carolina Panthers",
+  "Chicago Bears",
+  "Cincinnati Bengals",
+  "Cleveland Browns",
+  "Dallas Cowboys",
+  "Denver Broncos",
+  "Detroit Lions",
+  "Green Bay Packers",
+  "Houston Texans",
+  "Indianapolis Colts",
+  "Jacksonville Jaguars",
+  "Kansas City Chiefs",
+  "Las Vegas Raiders",
+  "Los Angeles Chargers",
+  "Los Angeles Rams",
+  "Miami Dolphins",
+  "Minnesota Vikings",
+  "New England Patriots",
+  "New Orleans Saints",
+  "New York Giants",
+  "New York Jets",
+  "Philadelphia Eagles",
+  "Pittsburgh Steelers",
+  "San Francisco 49ers",
+  "Seattle Seahawks",
+  "Tampa Bay Buccaneers",
+  "Tennessee Titans",
+  "Washington Commanders",
 ];
 
 type OddsApiEvent = {
@@ -48,24 +82,24 @@ async function seedSport(sport: Sport, canonicalNames: string[]) {
 }
 
 async function main() {
-  const bySport: Record<Sport, string[]> = { NFL: [], NCAA: [], CFL: [] };
-
-  for (const { key, sport } of SPORTS) {
-    bySport[sport] = await fetchDistinctTeamNames(key);
-  }
+  const bySport: Record<Sport, string[]> = {
+    NFL: [...NFL_TEAMS].sort(),
+    NCAA: await fetchDistinctTeamNames("americanfootball_ncaaf"),
+    CFL: [],
+  };
 
   const insertedCounts: Record<Sport, number> = { NFL: 0, NCAA: 0, CFL: 0 };
-  for (const { sport } of SPORTS) {
+  for (const sport of ["NFL", "NCAA"] as const) {
     insertedCounts[sport] = await seedSport(sport, bySport[sport]);
   }
 
-  for (const { sport } of SPORTS) {
+  for (const sport of ["NFL", "NCAA"] as const) {
     console.log(
       `${sport}: ${bySport[sport].length} distinct teams (${insertedCounts[sport]} inserted)`,
     );
   }
 
-  for (const { sport } of SPORTS) {
+  for (const sport of ["NFL", "NCAA"] as const) {
     console.log(`\nFirst 10 ${sport} canonical names:`);
     for (const name of bySport[sport].slice(0, 10)) {
       console.log(`  ${name}`);

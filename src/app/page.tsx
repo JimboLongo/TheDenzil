@@ -133,6 +133,11 @@ export default async function HomePage() {
             Board Builder (commish)
           </Link>
         )}
+        {seasonEntry.role === "commish" && (
+          <Link href={`/commish/config/${seasonEntry.seasonId}`}>
+            Season Board Config (commish)
+          </Link>
+        )}
       </nav>
     </main>
   );

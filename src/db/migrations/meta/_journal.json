@@ -64,6 +64,13 @@
       "when": 1789314084296,
       "tag": "0008_week_status",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789315326948,
+      "tag": "0009_season_board_defaults",
+      "breakpoints": true
     }
   ]
 }
