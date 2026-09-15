@@ -1,6 +1,7 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { db } from "../src/db";
-import { game, team, teamAlias, week } from "../src/db/schema";
+import { FIXTURE_SEASON_LABEL } from "../src/db/fixture";
+import { game, season, team, teamAlias, week } from "../src/db/schema";
 
 /**
  * Cleans up test/dev board state so a snapshot + curation cycle can be
@@ -12,8 +13,36 @@ import { game, team, teamAlias, week } from "../src/db/schema";
  *      null on every week.
  * Leaves odds-api-sourced games and teams untouched — this is a reset
  * of curation/manual-entry state, not the snapshot pool itself.
+ *
+ * Scoped by seasonId to exclude the Phase D fixture season (see
+ * src/db/fixture.ts): the fixture's games are also source = 'manual'
+ * (required by the schema's check constraint whenever externalEventId
+ * is null), but they carry real picks, so deleting them FK-errors.
+ * Fixture cleanup has its own tool — npm run seed:fixture:reset.
  */
 async function main() {
+  const [fixtureSeason] = await db
+    .select({ id: season.id })
+    .from(season)
+    .where(eq(season.label, FIXTURE_SEASON_LABEL))
+    .limit(1);
+
+  let fixtureWeekIds: number[] = [];
+  if (fixtureSeason) {
+    const fixtureWeeks = await db
+      .select({ id: week.id })
+      .from(week)
+      .where(eq(week.seasonId, fixtureSeason.id));
+    fixtureWeekIds = fixtureWeeks.map((w) => w.id);
+    console.log(
+      `excluding fixture season ${fixtureSeason.id} (${fixtureWeekIds.length} weeks) from reset`,
+    );
+  }
+
+  const manualGamesWhere = fixtureWeekIds.length > 0
+    ? and(eq(game.source, "manual"), notInArray(game.weekId, fixtureWeekIds))
+    : eq(game.source, "manual");
+
   const manualGames = await db
     .select({
       id: game.id,
@@ -22,7 +51,7 @@ async function main() {
       favoriteTeamId: game.favoriteTeamId,
     })
     .from(game)
-    .where(eq(game.source, "manual"));
+    .where(manualGamesWhere);
 
   if (manualGames.length > 0) {
     await db.delete(game).where(
@@ -72,9 +101,17 @@ async function main() {
   }
   console.log(`deleted ${teamsDeleted} manual team(s) and their alias(es)`);
 
-  await db.update(game).set({ isOnBoard: false });
-  await db.update(week).set({ linesPublishedAt: null });
-  console.log("reset isOnBoard=false on all games, linesPublishedAt=null on all weeks");
+  await db
+    .update(game)
+    .set({ isOnBoard: false })
+    .where(fixtureWeekIds.length > 0 ? notInArray(game.weekId, fixtureWeekIds) : undefined);
+  await db
+    .update(week)
+    .set({ linesPublishedAt: null })
+    .where(fixtureWeekIds.length > 0 ? notInArray(week.id, fixtureWeekIds) : undefined);
+  console.log(
+    "reset isOnBoard=false and linesPublishedAt=null on all non-fixture games/weeks",
+  );
 }
 
 main()

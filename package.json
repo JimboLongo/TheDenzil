@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "seed:teams": "tsx scripts/seed-teams.ts",
     "fetch:board": "tsx scripts/fetch-board.ts",
-    "seed:reset": "tsx scripts/seed-reset.ts"
+    "seed:reset": "tsx scripts/seed-reset.ts",
+    "seed:fixture": "tsx scripts/seed-fixture.ts",
+    "seed:fixture:reset": "tsx scripts/seed-fixture-reset.ts",
+    "fixture:expected": "tsx scripts/fixture-expectations.ts",
+    "settle:diff": "tsx scripts/settle-fixture-diff.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

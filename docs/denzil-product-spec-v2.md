@@ -135,17 +135,23 @@ canSee(viewer, pick):
 2. **Grade spreads:** `margin = selectedScore - oppScore + (isFavorite ? -spread : +spread)`. Positive WIN, negative LOSS, zero PUSH ($0).
 3. **Grade totals:** `combined = home + away`. Over wins if `combined > total`, Under if `<`, push if `=`.
 4. **No submission:** 9 losses at that entry's rate.
-5. **Weekly pool:** `Σ losses × 175`. All remainder above $1.75 goes to the season pool, including the handicap $0.50 and speed $2.25 excess.
-6. **Denzil Awards:** 0–9 → $75 from the weekly pool, capped 3/season, paid *before* the winner split.
+5. **Weekly pool:** `Σ losses × 175`. All remainder above $1.75 goes to the season pool, including the handicap $0.50 and speed $2.25 excess. **Pennies too:** when the post-Denzil remainder doesn't divide evenly across tied weekly winners, the 1–2 cents left over go to the season pool as well — same destination as every other remainder.
+6. **Denzil Awards:** 0–9 → $75 from the weekly pool, capped 3/season, paid *before* the winner split. **Requires a submission** (league rule 7: "A player must submit selections for the week in order to earn a Denzil Award"). A no-show's rule-4 auto-loss is 0–9 by the numbers and still costs them 9 losses, but earns no award.
 7. **Weekly Winner(s):** least **dollars** lost, not fewest losses. A speed player at 1 loss ($4) finishes behind a base player at 1 loss ($2). Split the post-Denzil remainder equally.
 8. **Mary Rose:** 9–0, $0.
 
 ```
-seasonPool = Σ entryFees + Σ (loss remainders above $1.75)
+seasonPool = Σ entryFees + Σ (loss remainders above $1.75) + Σ (weekly pool pennies)
 standings  = rank by cumulative grossLossCents ASC    // excludes weekly wins + awards
 payouts    = seasonPool × [36,18,15,11,8,6,4,2]%
 netSettle  = weeklyWinnings + denzilAwards + seasonPayout - grossLoss - entryFee
 ```
+
+**Season Pool eligibility.** League rule 1: "All entries must be submitted in the first week to be considered eligible for the Season Pool." An entry with `seasonPoolEligible = false` still settles every week — it loses money at its rate, feeds the weekly pool, can take a Denzil Award, and can win a weekly pool — but it is excluded from the season standings and takes no season payout. Its entry fee and loss remainders still fund the season pool; eligibility restricts who can be paid *from* the pool, not who pays *into* it. Ranks are assigned across eligible entries only, so an ineligible entry never displaces anyone.
+
+**Standings ties.** Tied players occupy consecutive rank slots. Sum the payout percentage of every slot the tie occupies and split it evenly across them; the next player down takes the rank after the last occupied slot. Two players tied for 3rd occupy ranks 3 and 4, so they split 15% + 11% = 26% — 13% each — and the next player is rank 5. A tie straddling the payout cutoff works the same way: ranks 8 and 9 split 2% + 0%, so 1% each.
+
+Because the eight percentages sum to 100, the pool is fully distributed by construction. Integer cents still need a tie-break: allocate each share's whole cents first, then hand the leftover pennies to the largest fractional remainders, best rank first. Every cent lands on a player.
 
 Keep weekly winnings and awards visibly separate from standings on every screen, or people will argue.
 
@@ -253,8 +259,8 @@ Estimates assume Claude Code implementing, you reviewing.
 
 ### Before Phase D
 1. **Denzil overflow** — three 0–9 weeks, $225 in awards, $180 in the pool. Season pool absorbs it, or prorate?
-2. **Season standings ties** — two players tied for 3rd: combine 15% + 11% and split? Same for the last-place free pass.
-3. **Make-up game rate** — settles at the prior week's rate or the current week's?
+2. **Make-up game rate** — settles at the prior week's rate or the current week's?
+3. **Last-place free pass ties** — two players tied for last: who gets the free season? Section 3's standings-tie rule covers payout ranks, not this.
 
 ### Before Phase F
 4. **`Line` format for 2022-23 onward** — determines how far back pick-level records reach.
