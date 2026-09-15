@@ -39,6 +39,15 @@ function spreadLabels(g: BoardGame): { home: string; away: string } {
   };
 }
 
+/**
+ * One game: a header naming the matchup, market and kickoff, then the two
+ * sides stacked. Away sits on top and home underneath, matching the
+ * "Away @ Home" line in the header so the two read in the same order.
+ *
+ * The header has to carry the matchup: the same fixture appears twice on
+ * the board, once as a spread and once as a total, and a bare "Over 44.5"
+ * says nothing about which game it belongs to.
+ */
 function GameRow({
   g,
   selection,
@@ -52,61 +61,61 @@ function GameRow({
 }) {
   const started = g.kickoffAt <= now;
 
-  let sideALabel: string;
-  let sideAValue: PickSelection;
-  let sideBLabel: string;
-  let sideBValue: PickSelection;
-
-  if (g.market === "SPREAD") {
-    const labels = spreadLabels(g);
-    sideALabel = labels.home;
-    sideAValue = "HOME";
-    sideBLabel = labels.away;
-    sideBValue = "AWAY";
-  } else {
-    sideALabel = `Over ${g.totalPoints ?? "?"}`;
-    sideAValue = "OVER";
-    sideBLabel = `Under ${g.totalPoints ?? "?"}`;
-    sideBValue = "UNDER";
-  }
-
-  function renderSide(label: string, value: PickSelection) {
-    const isSelected = selection === value;
-    const isOtherSelected = Boolean(selection) && selection !== value;
-    const disabled = started || isOtherSelected;
-
-    return (
-      <div>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onPick(value)}
-          className={`rounded border px-2 py-1 text-left disabled:opacity-40 ${
-            isSelected
-              ? "border-info-border bg-info font-bold text-info-fg"
-              : "border-border bg-surface-raised"
-          }`}
-        >
-          {label}
-        </button>
-        {isOtherSelected && (
-          <div className="text-xs text-text-muted">
-            you picked the other side
-          </div>
-        )}
-      </div>
-    );
-  }
+  const sides: { label: string; value: PickSelection }[] =
+    g.market === "SPREAD"
+      ? [
+          { label: spreadLabels(g).away, value: "AWAY" },
+          { label: spreadLabels(g).home, value: "HOME" },
+        ]
+      : [
+          { label: `Over ${g.totalPoints ?? "?"}`, value: "OVER" },
+          { label: `Under ${g.totalPoints ?? "?"}`, value: "UNDER" },
+        ];
 
   return (
-    <tr className={`border-b border-border ${started ? "opacity-50" : ""}`}>
-      <td className="p-1.5 whitespace-nowrap align-top">
-        {ET_DATE_FORMAT.format(g.kickoffAt)}
-        {started && <span className="text-danger-fg"> — started</span>}
-      </td>
-      <td className="p-1.5 align-top">{renderSide(sideALabel, sideAValue)}</td>
-      <td className="p-1.5 align-top">{renderSide(sideBLabel, sideBValue)}</td>
-    </tr>
+    <li
+      className={`grid gap-2 border-b border-border py-3 sm:grid-cols-[1fr_18rem] sm:items-center sm:gap-6 ${
+        started ? "opacity-50" : ""
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="font-medium">
+          {g.awayName} @ {g.homeName}
+        </div>
+        <div className="text-sm text-text-muted">
+          {g.market === "SPREAD" ? "Spread" : "Total"} · {ET_DATE_FORMAT.format(g.kickoffAt)}
+          {started && <span className="text-danger-fg"> — started</span>}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {sides.map(({ label, value }) => {
+          const isSelected = selection === value;
+          const isOtherSelected = Boolean(selection) && selection !== value;
+          return (
+            <button
+              key={value}
+              type="button"
+              disabled={started || isOtherSelected}
+              onClick={() => onPick(value)}
+              title={isOtherSelected ? "You picked the other side of this game" : undefined}
+              className={`min-h-10 w-full rounded border px-3 py-1.5 text-left disabled:opacity-40 ${
+                isSelected
+                  ? "border-info-border bg-info font-bold text-info-fg"
+                  : "border-border bg-surface-raised"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+        {selection && (
+          <p className="text-xs text-text-muted">
+            Picked {sides.find((s) => s.value === selection)?.label} — tap it again to clear.
+          </p>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -166,7 +175,7 @@ export function PicksForm({
   })).filter((s) => s.games.length > 0);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <p className="text-lg font-bold">
         {selectedCount} of {REQUIRED_PICKS} selected
       </p>
@@ -194,22 +203,20 @@ export function PicksForm({
 
       {bySport.map(({ sport, games: sportGames }) => (
         <section key={sport}>
-          <h2>
+          <h2 className="mb-1 font-semibold">
             {sport} ({sportGames.length})
           </h2>
-          <table className="w-full border-collapse text-sm">
-            <tbody>
-              {sportGames.map((g) => (
-                <GameRow
-                  key={g.id}
-                  g={g}
-                  selection={selections[g.id]}
-                  now={now}
-                  onPick={(selection) => pickGame(g.id, selection)}
-                />
-              ))}
-            </tbody>
-          </table>
+          <ul className="text-sm">
+            {sportGames.map((g) => (
+              <GameRow
+                key={g.id}
+                g={g}
+                selection={selections[g.id]}
+                now={now}
+                onPick={(selection) => pickGame(g.id, selection)}
+              />
+            ))}
+          </ul>
         </section>
       ))}
 
