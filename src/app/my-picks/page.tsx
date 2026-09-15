@@ -2,7 +2,14 @@ import { and, asc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { game, pick, submission, team, week, weekResult } from "@/db/schema";
+import { getCurrentWeek } from "@/db/weeks";
 import { getCurrentPlayer } from "@/lib/auth/getCurrentPlayer";
+import { deleteSubmissionAction } from "./actions";
+import { DeleteSubmissionButton } from "./DeleteSubmissionButton";
+
+// The button is also gated inside the action itself — this only keeps it
+// off the page, which is not a control on its own.
+const SHOW_DEV_UNSUBMIT = process.env.NODE_ENV !== "production";
 
 const ET_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York",
@@ -57,6 +64,8 @@ export default async function MyPicksPage() {
     .from(week)
     .where(eq(week.seasonId, seasonEntry.seasonId))
     .orderBy(asc(week.number));
+
+  const currentWeek = await getCurrentWeek(seasonEntry.seasonId);
 
   const homeTeam = alias(team, "home_team");
   const awayTeam = alias(team, "away_team");
@@ -147,6 +156,12 @@ export default async function MyPicksPage() {
                   </li>
                 ))}
               </ul>
+              {SHOW_DEV_UNSUBMIT && currentWeek?.id === w.id && (
+                <DeleteSubmissionButton
+                  weekNumber={w.number}
+                  deleteSubmission={deleteSubmissionAction.bind(null, w.id)}
+                />
+              )}
             </>
           ) : (
             <p className="text-text-muted">No submission.</p>
