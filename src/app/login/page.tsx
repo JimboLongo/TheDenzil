@@ -1,7 +1,12 @@
-import { requestMagicLink } from "./actions";
+import { LoginForm } from "./LoginForm";
 
+// Errors Auth.js can bounce back here on its own (an expired or reused
+// link, for instance). Failures from the form itself are returned by the
+// action and rendered by LoginForm.
 const ERROR_MESSAGES: Record<string, string> = {
-  AccessDenied: "This email is not a member of this league. Contact your commissioner.",
+  AccessDenied:
+    "That email isn't on the league roster. The Denzil is invite-only — an existing member has to sponsor you. Ask your commissioner to add your email, then try again.",
+  Verification: "That sign-in link has expired or was already used. Request a fresh one below.",
 };
 
 export default async function LoginPage({
@@ -10,22 +15,33 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  const message = error
-    ? (ERROR_MESSAGES[error] ?? "Something went wrong signing in. Try again.")
+  const initialError = error
+    ? (ERROR_MESSAGES[error] ?? "Something went wrong signing in. Request a new link below.")
     : null;
 
   return (
-    <main className="flex max-w-sm flex-col gap-3 p-4 sm:p-6">
-      <h1>Sign in</h1>
-      <p>Enter the email your commissioner has on file. We&apos;ll send a link.</p>
-      {message && <p className="rounded border border-danger-border bg-danger px-3 py-2 text-danger-fg">{message}</p>}
-      <form action={requestMagicLink} className="grid gap-2">
-        <label>
-          Email
-          <input type="email" name="email" required />
-        </label>
-        <button type="submit">Send magic link</button>
-      </form>
+    <main className="flex min-h-[80vh] items-center justify-center p-4 sm:p-6">
+      <div className="flex w-full max-w-sm flex-col gap-5">
+        <header className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight">The Denzil</h1>
+          <p className="text-text-muted">
+            Nine picks a week — spreads and totals across the NFL and college — every week of the
+            season. Lowest dollars lost takes the week.
+          </p>
+        </header>
+
+        <div className="rounded-lg border border-border bg-surface-raised p-4 sm:p-5">
+          <p className="mb-4">
+            Enter the email your commissioner has on file. We&apos;ll send you a sign-in link — no
+            password needed. You&apos;ll stay signed in all season.
+          </p>
+          <LoginForm initialError={initialError} />
+        </div>
+
+        <p className="text-center text-sm text-text-muted">
+          Not a member? The Denzil is sponsor-based — ask a current player to put you forward.
+        </p>
+      </div>
     </main>
   );
 }

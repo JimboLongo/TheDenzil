@@ -5,6 +5,9 @@ import Resend from "next-auth/providers/resend";
 import { db } from "./db";
 import { account, player, session, user, verificationToken } from "./db/schema";
 
+/** 180 days — long enough to cover a full season end to end. */
+export const SESSION_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: user,
@@ -20,7 +23,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       from: "The Denzil <onboarding@resend.dev>",
     }),
   ],
-  session: { strategy: "database" },
+  // A season runs September to January, so a player who signs in once in
+  // week 1 should still be signed in for the championship game.
+  //
+  // For database sessions Auth.js writes maxAge onto the session row and
+  // then stamps the cookie's Expires from that same row, so this single
+  // setting covers both. The cookie carries a real Expires date rather
+  // than being a session cookie, which is what makes it survive a
+  // browser restart -- verified on the Set-Cookie header, not assumed.
+  //
+  // updateAge rolls that expiry forward at most once a day, so a player
+  // who keeps showing up never approaches the 180-day edge.
+  session: {
+    strategy: "database",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    updateAge: 24 * 60 * 60,
+  },
   pages: {
     signIn: "/login",
     error: "/login",
