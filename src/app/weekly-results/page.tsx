@@ -9,6 +9,7 @@ import { formatCents } from "@/lib/picks/labels";
 import { parseSettlementConfig } from "@/lib/settlement/config";
 import { gradePick } from "@/lib/settlement/grade";
 import { assignRate, leadingGroup } from "@/lib/settlement/rates";
+import { PageShell as Shell } from "../_components/PageShell";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,20 @@ export default async function WeeklyResultsPage() {
   }
 
   const [seasonRow] = await db.select().from(season).where(eq(season.id, viewerEntry.seasonId)).limit(1);
-  const config = parseSettlementConfig(seasonRow.config);
+  // Same reasoning as Standings: no config means no rates, and a clear
+  // sentence beats a white error screen.
+  let config;
+  try {
+    config = parseSettlementConfig(seasonRow.config);
+  } catch (err) {
+    return (
+      <Shell>
+        <h1 className="text-xl font-semibold">Weekly Results</h1>
+        <p>This season has no settlement configuration yet, so records can&apos;t be priced.</p>
+        <p className="text-sm text-text-muted">{(err as Error).message}</p>
+      </Shell>
+    );
+  }
 
   const entries = await db
     .select()
@@ -173,12 +187,12 @@ export default async function WeeklyResultsPage() {
 
   return (
     <Shell>
-      <h1>
+      <h1 className="text-xl font-semibold">
         Weekly Results — Week {currentWeek.number}{" "}
-        <span style={{ fontWeight: "normal", fontSize: "0.6em", color: "#888" }}>({currentWeek.status})</span>
+        <span className="text-sm font-normal text-text-muted">({currentWeek.status})</span>
       </h1>
 
-      <p style={{ padding: "0.6rem 0.8rem", background: "#eef2ff", border: "1px solid rgba(0,0,0,0.1)" }}>
+      <p className="rounded border border-info-border bg-info px-3 py-2 text-info-fg">
         <strong>{anyPending ? "Projected winner" : "Weekly winner"}:</strong>{" "}
         {winners.length === 0
           ? "—"
@@ -188,7 +202,7 @@ export default async function WeeklyResultsPage() {
       </p>
 
       {watchers.length > 0 && (
-        <p style={{ padding: "0.6rem 0.8rem", background: "#fdecea", border: "1px solid #f5c2c0" }}>
+        <p className="rounded border border-danger-border bg-danger px-3 py-2 text-danger-fg">
           <strong>Denzil watch:</strong>{" "}
           {watchers
             .map((w) => `${w.displayName} (${w.wins}-${w.losses}, ${w.pending} left)`)
@@ -196,104 +210,88 @@ export default async function WeeklyResultsPage() {
         </p>
       )}
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid #ccc" }}>
-            <th style={{ padding: "0.4rem" }}>#</th>
-            <th style={{ padding: "0.4rem" }}>Player</th>
-            <th style={{ padding: "0.4rem" }}>Record</th>
-            <th style={{ padding: "0.4rem" }}>Pending</th>
-            <th style={{ padding: "0.4rem" }}>Rate</th>
-            <th style={{ padding: "0.4rem", textAlign: "right" }}>Lost</th>
-            <th style={{ padding: "0.4rem" }}>Badges</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((r, i) => {
-            const isWinner = winners.some((w) => w.entryId === r.entryId);
-            return (
-              <tr
-                key={r.entryId}
-                style={{
-                  borderBottom: "1px solid #eee",
-                  background: isWinner
-                    ? "rgba(26,127,55,0.10)"
-                    : r.isSelf
-                      ? "rgba(37,99,235,0.08)"
-                      : undefined,
-                }}
-              >
-                <td style={{ padding: "0.4rem", color: "#888" }}>{r.awaitingSubmission ? "—" : i + 1}</td>
-                <td style={{ padding: "0.4rem", fontWeight: r.isSelf || isWinner ? "bold" : "normal" }}>
-                  {r.displayName}
-                  {r.isSelf ? " (you)" : ""}
-                </td>
-                <td style={{ padding: "0.4rem" }}>
-                  {r.awaitingSubmission ? (
-                    <span style={{ color: "#b8860b" }}>not submitted yet</span>
-                  ) : r.isAutoLoss ? (
-                    <span style={{ color: "#b00020" }}>no show — 0-{r.losses}</span>
-                  ) : (
-                    `${r.wins}-${r.losses}${r.pushes ? `-${r.pushes}` : ""}`
-                  )}
-                </td>
-                <td style={{ padding: "0.4rem", color: r.pending ? "#b8860b" : "#ccc" }}>
-                  {r.pending || "—"}
-                </td>
-                <td style={{ padding: "0.4rem", whiteSpace: "nowrap" }}>
-                  {r.rate.kind} {formatCents(r.rate.cents)}
-                </td>
-                <td style={{ padding: "0.4rem", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                  {r.awaitingSubmission ? "—" : formatCents(r.grossLossCents)}
-                </td>
-                <td style={{ padding: "0.4rem", whiteSpace: "nowrap" }}>
-                  {isWinner && !r.awaitingSubmission && <Badge bg="#1a7f37">weekly winner</Badge>}
-                  {r.isMaryRose && <Badge bg="#6b21a8">Mary Rose 9-0</Badge>}
-                  {r.isDenzil && <Badge bg="#b00020">Denzil 0-9</Badge>}
-                  {r.onDenzilWatch && <Badge bg="#b8860b">Denzil watch</Badge>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b-2 border-border-strong text-left">
+              <th className="p-1.5">#</th>
+              <th className="p-1.5">Player</th>
+              <th className="p-1.5">Record</th>
+              <th className="p-1.5">Pending</th>
+              <th className="p-1.5">Rate</th>
+              <th className="p-1.5 text-right">Lost</th>
+              <th className="p-1.5">Badges</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r, i) => {
+              const isWinner = winners.some((w) => w.entryId === r.entryId);
+              return (
+                <tr
+                  key={r.entryId}
+                  className={`border-b border-border ${
+                    isWinner ? "bg-row-winner" : r.isSelf ? "bg-row-self" : ""
+                  }`}
+                >
+                  <td className="p-1.5 text-text-muted">{r.awaitingSubmission ? "—" : i + 1}</td>
+                  <td className={`p-1.5 ${r.isSelf || isWinner ? "font-bold" : ""}`}>
+                    {r.displayName}
+                    {r.isSelf ? " (you)" : ""}
+                  </td>
+                  <td className="p-1.5">
+                    {r.awaitingSubmission ? (
+                      <span className="text-warning-fg">not submitted yet</span>
+                    ) : r.isAutoLoss ? (
+                      <span className="text-danger-fg">no show — 0-{r.losses}</span>
+                    ) : (
+                      `${r.wins}-${r.losses}${r.pushes ? `-${r.pushes}` : ""}`
+                    )}
+                  </td>
+                  <td className={`p-1.5 ${r.pending ? "text-warning-fg" : "text-text-muted"}`}>
+                    {r.pending || "—"}
+                  </td>
+                  <td className="p-1.5 whitespace-nowrap">
+                    {r.rate.kind} {formatCents(r.rate.cents)}
+                  </td>
+                  <td className="p-1.5 text-right tabular-nums">
+                    {r.awaitingSubmission ? "—" : formatCents(r.grossLossCents)}
+                  </td>
+                  <td className="p-1.5 whitespace-nowrap">
+                    {isWinner && !r.awaitingSubmission && <Badge tone="success">weekly winner</Badge>}
+                    {r.isMaryRose && <Badge tone="info">Mary Rose 9-0</Badge>}
+                    {r.isDenzil && <Badge tone="danger">Denzil 0-9</Badge>}
+                    {r.onDenzilWatch && <Badge tone="warning">Denzil watch</Badge>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      <p style={{ fontSize: "0.8em", color: "#666", marginTop: "1rem" }}>
+      <p className="text-xs text-text-muted">
         Dollars are gross loss only. Weekly pool winnings and awards are tracked separately — see{" "}
-        <Link href="/standings">Standings</Link>.
+        <Link href="/standings" className="underline underline-offset-2">
+          Standings
+        </Link>
+        .
       </p>
     </Shell>
   );
 }
 
-function Badge({ bg, children }: { bg: string; children: React.ReactNode }) {
+const BADGE_TONES = {
+  success: "bg-success text-success-fg border-success-border",
+  info: "bg-info text-info-fg border-info-border",
+  danger: "bg-danger text-danger-fg border-danger-border",
+  warning: "bg-warning text-warning-fg border-warning-border",
+} as const;
+
+function Badge({ tone, children }: { tone: keyof typeof BADGE_TONES; children: React.ReactNode }) {
   return (
-    <span
-      style={{
-        display: "inline-block",
-        background: bg,
-        color: "#fff",
-        borderRadius: 3,
-        padding: "0.1rem 0.35rem",
-        fontSize: "0.75em",
-        marginRight: "0.25rem",
-      }}
-    >
+    <span className={`mr-1 inline-block rounded border px-1.5 py-0.5 text-xs ${BADGE_TONES[tone]}`}>
       {children}
     </span>
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
-      <nav style={{ marginBottom: "1rem", display: "flex", gap: "1rem", fontSize: "0.9em" }}>
-        <Link href="/">Home</Link>
-        <Link href="/league-picks">League Picks</Link>
-        <Link href="/standings">Standings</Link>
-        <Link href="/my-picks">My Picks</Link>
-      </nav>
-      {children}
-    </main>
-  );
-}

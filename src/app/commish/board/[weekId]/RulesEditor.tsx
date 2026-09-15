@@ -202,23 +202,23 @@ export function RulesEditor({
   }
 
   return (
-    <form ref={formRef} style={{ display: "grid", gap: "1.5rem" }}>
+    <form ref={formRef} className="grid gap-6">
       <section>
         <h2>Board rules</h2>
         {SPORT_ORDER.map((sport) => {
           const s = ruleState[sport];
           const teams = teamsBySport[sport] ?? [];
           return (
-            <fieldset key={sport} style={{ marginBottom: "1rem" }}>
+            <fieldset key={sport} className="mb-4 rounded border border-border p-3">
               <legend>{sport}</legend>
 
               {MARKET_ORDER.map((market) => (
-                <div key={market} style={{ marginBottom: "0.35rem" }}>
-                  <strong style={{ display: "inline-block", width: 60 }}>
+                <div key={market} className="mb-1.5">
+                  <strong className="inline-block w-16">
                     {market}
                   </strong>{" "}
                   {DAY_LABELS.map((label, day) => (
-                    <label key={day} style={{ marginRight: "0.5rem" }}>
+                    <label key={day} className="mr-2">
                       <input
                         type="checkbox"
                         name={`rule_${sport}_${market}_day_${day}`}
@@ -231,7 +231,7 @@ export function RulesEditor({
                 </div>
               ))}
 
-              <div style={{ display: "flex", gap: "1.5rem", marginTop: "0.5rem" }}>
+              <div className="mt-2 flex flex-wrap gap-6">
                 <div>
                   <label>
                     <input
@@ -258,7 +258,7 @@ export function RulesEditor({
                         )
                       }
                       size={Math.min(8, teams.length || 1)}
-                      style={{ display: "block", minWidth: 240 }}
+                      className="block min-w-60 rounded border border-border bg-surface-raised"
                     >
                       {teams.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -295,7 +295,7 @@ export function RulesEditor({
                         )
                       }
                       size={Math.min(8, teams.length || 1)}
-                      style={{ display: "block", minWidth: 240 }}
+                      className="block min-w-60 rounded border border-border bg-surface-raised"
                     >
                       {teams.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -312,22 +312,22 @@ export function RulesEditor({
       </section>
 
       <section>
-        <p style={{ fontWeight: "bold" }}>
+        <p className="font-bold">
           {previewIds.size} game(s) match these rules
         </p>
         {previewIds.size === 0 ? (
-          <p style={{ color: "#b00020" }}>
+          <p className="rounded border border-danger-border bg-danger px-3 py-2 text-danger-fg">
             Board is empty — Publish is blocked until at least one game is
             included.
           </p>
         ) : (
           boardSizeWarning(previewIds.size) && (
-            <p style={{ color: "#8a6d00" }}>
+            <p className="rounded border border-warning-border bg-warning px-3 py-2 text-warning-fg">
               {boardSizeWarning(previewIds.size)}
             </p>
           )
         )}
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div className="flex flex-wrap gap-2">
           <button type="submit" formAction={saveRulesAction}>
             Save rules
           </button>
@@ -340,7 +340,7 @@ export function RulesEditor({
           </button>
         </div>
         {publishResult && (
-          <p style={{ color: publishResult.ok ? "#8a6d00" : "#b00020" }}>
+          <p className={publishResult.ok ? "text-success-fg" : "text-danger-fg"}>
             {publishResult.ok
               ? (publishResult.message ?? "Published.")
               : publishResult.message}
@@ -357,9 +357,9 @@ export function RulesEditor({
             <h3>
               {sport} ({sportGames.length})
             </h3>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
+                <tr className="border-b-2 border-border-strong text-left">
                   <th>Matchup</th>
                   <th>Kickoff (ET)</th>
                   <th>Market</th>
@@ -374,7 +374,7 @@ export function RulesEditor({
                   const inPreview = previewIds.has(g.id);
                   const override = overridesMap.get(g.id);
                   return (
-                    <tr key={g.id} style={{ borderBottom: "1px solid #eee" }}>
+                    <tr key={g.id} className="border-b border-border">
                       <td>
                         {g.awayName} @ {g.homeName}
                       </td>

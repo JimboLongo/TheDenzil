@@ -47,7 +47,7 @@ function DayPicker({
 }) {
   const daySet = new Set(days);
   return (
-    <div style={{ display: "flex", gap: 2 }}>
+    <div className="flex gap-0.5">
       {DAY_LABELS.map((label, day) => (
         <button
           key={day}
@@ -55,17 +55,11 @@ function DayPicker({
           disabled={disabled}
           onClick={() => onToggle(day)}
           title={DAY_NAMES[day]}
-          style={{
-            width: 20,
-            height: 20,
-            fontSize: 10,
-            lineHeight: "18px",
-            padding: 0,
-            background: daySet.has(day) ? "#2563eb" : "transparent",
-            color: daySet.has(day) ? "#fff" : "inherit",
-            border: "1px solid #999",
-            cursor: disabled ? "not-allowed" : "pointer",
-          }}
+          className={`h-5 w-5 border p-0 text-[10px] leading-[18px] disabled:cursor-not-allowed ${
+            daySet.has(day)
+              ? "border-info-border bg-info text-info-fg"
+              : "border-border-strong bg-transparent"
+          }`}
         >
           {label}
         </button>
@@ -209,11 +203,11 @@ export function BoardConfigGrid({
   const weeks1to17 = allWeekNumbers.filter((n) => n !== TOTAL_WEEKS);
 
   return (
-    <div style={{ display: "grid", gap: "1.5rem" }}>
-      <section style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
-        <fieldset style={{ maxWidth: 420 }}>
+    <div className="grid gap-6">
+      <section className="flex flex-wrap gap-8">
+        <fieldset className="max-w-[420px] rounded border border-border p-3">
           <legend>NFL teams ({nflTeamIds.size} of {nflTeams.length})</legend>
-          <div style={{ marginBottom: "0.35rem" }}>
+          <div className="mb-1.5">
             <button type="button" onClick={() => setNflTeamIds(new Set(nflTeams.map((t) => t.id)))}>
               All
             </button>{" "}
@@ -222,16 +216,10 @@ export function BoardConfigGrid({
             </button>
           </div>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "0.15rem 1rem",
-              maxHeight: 220,
-              overflowY: "auto",
-            }}
+            className="grid max-h-[220px] grid-cols-2 gap-x-4 gap-y-0.5 overflow-y-auto"
           >
             {nflTeams.map((t) => (
-              <label key={t.id} style={{ fontSize: "0.9em" }}>
+              <label key={t.id} className="text-sm">
                 <input
                   type="checkbox"
                   checked={nflTeamIds.has(t.id)}
@@ -243,17 +231,17 @@ export function BoardConfigGrid({
           </div>
         </fieldset>
 
-        <fieldset style={{ maxWidth: 420 }}>
+        <fieldset className="max-w-[420px] rounded border border-border p-3">
           <legend>
             NCAA teams ({ncaaTeamIds.size} of {ncaaTeams.length})
           </legend>
-          <div style={{ marginBottom: "0.35rem" }}>
+          <div className="mb-1.5">
             <input
               type="text"
               placeholder="Search teams…"
               value={ncaaFilter}
               onChange={(e) => setNcaaFilter(e.target.value)}
-              style={{ marginRight: "0.5rem" }}
+              className="mr-2 rounded border border-border bg-surface-raised px-1"
             />
             <button type="button" onClick={() => setNcaaTeamIds(new Set(ncaaTeams.map((t) => t.id)))}>
               All
@@ -263,16 +251,10 @@ export function BoardConfigGrid({
             </button>
           </div>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "0.15rem 1rem",
-              maxHeight: 220,
-              overflowY: "auto",
-            }}
+            className="grid max-h-[220px] grid-cols-2 gap-x-4 gap-y-0.5 overflow-y-auto"
           >
             {filteredNcaaTeams.map((t) => (
-              <label key={t.id} style={{ fontSize: "0.9em" }}>
+              <label key={t.id} className="text-sm">
                 <input
                   type="checkbox"
                   checked={ncaaTeamIds.has(t.id)}
@@ -286,24 +268,24 @@ export function BoardConfigGrid({
       </section>
 
       <section>
-        <div style={{ marginBottom: "0.5rem" }}>
+        <div className="mb-2">
           Clear column:{" "}
           {GRID_CELL_KEYS.map((key) => (
             <button
               key={key}
               type="button"
               onClick={() => clearColumn(key)}
-              style={{ marginRight: "0.5rem" }}
+              className="mr-2"
             >
               {COLUMN_LABELS[key]}
             </button>
           ))}
         </div>
 
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
+              <tr className="border-b-2 border-border-strong text-left">
                 <th>Week</th>
                 <th>Type</th>
                 {GRID_CELL_KEYS.map((key) => (
@@ -319,8 +301,8 @@ export function BoardConfigGrid({
                 const cell = grid[n];
 
                 return (
-                  <tr key={n} style={{ borderBottom: "1px solid #eee" }}>
-                    <td style={{ whiteSpace: "nowrap" }}>
+                  <tr key={n} className="border-b border-border">
+                    <td className="whitespace-nowrap">
                       Week {n}
                       {locked && (
                         <span title="Board published — locked, edit via overrides on the week page">
@@ -335,7 +317,7 @@ export function BoardConfigGrid({
                         </span>
                       )}
                       {!meta?.weekId && (
-                        <span style={{ color: "#999", fontSize: "0.85em" }}>
+                        <span className="text-sm text-text-muted">
                           {" "}
                           (not created yet)
                         </span>
@@ -343,7 +325,7 @@ export function BoardConfigGrid({
                       {meta?.weekId && (
                         <>
                           {" "}
-                          <Link href={`/commish/board/${meta.weekId}`} style={{ fontSize: "0.85em" }}>
+                          <Link href={`/commish/board/${meta.weekId}`} className="text-sm underline underline-offset-2">
                             edit
                           </Link>
                         </>
@@ -366,13 +348,13 @@ export function BoardConfigGrid({
                             ))}
                           </select>
                           {typeMessages[meta.weekId] && (
-                            <div style={{ fontSize: "0.75em", color: "#666" }}>
+                            <div className="text-xs text-text-muted">
                               {typeMessages[meta.weekId]}
                             </div>
                           )}
                         </>
                       ) : (
-                        <span style={{ color: "#999" }}>—</span>
+                        <span className="text-text-muted">—</span>
                       )}
                     </td>
                     {GRID_CELL_KEYS.map((key) => (
@@ -384,7 +366,7 @@ export function BoardConfigGrid({
                         />
                       </td>
                     ))}
-                    <td style={{ whiteSpace: "nowrap" }}>
+                    <td className="whitespace-nowrap">
                       <button
                         type="button"
                         disabled={locked}
@@ -413,12 +395,12 @@ export function BoardConfigGrid({
           Save grid
         </button>
         {saveResult && (
-          <div style={{ marginTop: "0.5rem" }}>
-            <p style={{ color: saveResult.ok ? "#8a6d00" : "#b00020" }}>
+          <div className="mt-2">
+            <p className={saveResult.ok ? "text-success-fg" : "text-danger-fg"}>
               {saveResult.message}
             </p>
             {saveResult.skipped.length > 0 && (
-              <ul style={{ fontSize: "0.9em", color: "#666" }}>
+              <ul className="text-sm text-text-muted">
                 {saveResult.skipped.map((s) => (
                   <li key={s.number}>
                     Week {s.number}:{" "}

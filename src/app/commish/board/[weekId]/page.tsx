@@ -104,7 +104,7 @@ export default async function BoardPage({
     }
 
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 960 }}>
+      <main className="flex max-w-5xl flex-col gap-3 p-4 sm:p-6">
 <h1>
           Week {weekRow.number} Board — {weekRow.type}
         </h1>
@@ -113,22 +113,22 @@ export default async function BoardPage({
           are locked. Only overrides (each writes a ruling) can change what
           follows.
         </p>
-        <p style={{ fontWeight: "bold" }}>{onBoardCount} game(s) on board</p>
+        <p className="font-bold">{onBoardCount} game(s) on board</p>
         {boardSizeWarning(onBoardCount) && (
-          <p style={{ color: "#8a6d00" }}>{boardSizeWarning(onBoardCount)}</p>
+          <p className="rounded border border-warning-border bg-warning px-3 py-2 text-warning-fg">{boardSizeWarning(onBoardCount)}</p>
         )}
 
         {SPORT_ORDER.map((sport) => {
           const sportRows = bySport.get(sport) ?? [];
           if (sportRows.length === 0) return null;
           return (
-            <section key={sport} style={{ marginBottom: "2rem" }}>
+            <section key={sport} className="mb-6">
               <h2>
                 {sport} ({sportRows.length})
               </h2>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
+                  <tr className="border-b-2 border-border-strong text-left">
                     <th>Matchup</th>
                     <th>Kickoff (ET)</th>
                     <th>Market</th>
@@ -140,7 +140,7 @@ export default async function BoardPage({
                 </thead>
                 <tbody>
                   {sportRows.map((row) => (
-                    <tr key={row.id} style={{ borderBottom: "1px solid #eee" }}>
+                    <tr key={row.id} className="border-b border-border">
                       <td>
                         {row.awayName} @ {row.homeName}
                       </td>
@@ -150,10 +150,10 @@ export default async function BoardPage({
                       <td>{row.sourceBook ?? "manual"}</td>
                       <td>{row.isOnBoard ? "yes" : "no"}</td>
                       <td>
-                        <form action={boundSetOverride.bind(null, row.id, "INCLUDE")} style={{ display: "inline" }}>
+                        <form action={boundSetOverride.bind(null, row.id, "INCLUDE")} className="inline">
                           <button type="submit">Force include</button>
                         </form>{" "}
-                        <form action={boundSetOverride.bind(null, row.id, "EXCLUDE")} style={{ display: "inline" }}>
+                        <form action={boundSetOverride.bind(null, row.id, "EXCLUDE")} className="inline">
                           <button type="submit">Force exclude</button>
                         </form>
                       </td>
@@ -208,7 +208,7 @@ export default async function BoardPage({
   }));
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 960 }}>
+    <main className="flex max-w-5xl flex-col gap-3 p-4 sm:p-6">
       <h1>
         Week {weekRow.number} Board — {weekRow.type}
       </h1>
@@ -220,7 +220,7 @@ export default async function BoardPage({
         board membership below is derived from rules, live.
       </p>
 
-      <form action={takeSnapshotAction.bind(null, weekId)} style={{ marginBottom: "1.5rem" }}>
+      <form action={takeSnapshotAction.bind(null, weekId)} className="mb-6">
         <button type="submit">Take snapshot</button>
       </form>
 
@@ -235,11 +235,11 @@ export default async function BoardPage({
         setOverrideAction={boundSetOverride}
       />
 
-      <section style={{ marginTop: "2rem" }}>
+      <section className="mt-6">
         <h2>Add a manual game</h2>
         <form
           action={createManualGameAction.bind(null, weekId)}
-          style={{ display: "grid", gap: "0.5rem", maxWidth: 400 }}
+          className="grid max-w-sm gap-2"
         >
           <label>
             Sport

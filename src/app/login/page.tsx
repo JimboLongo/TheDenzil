@@ -15,11 +15,11 @@ export default async function LoginPage({
     : null;
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 400 }}>
+    <main className="flex max-w-sm flex-col gap-3 p-4 sm:p-6">
       <h1>Sign in</h1>
       <p>Enter the email your commissioner has on file. We&apos;ll send a link.</p>
-      {message && <p style={{ color: "#b00020" }}>{message}</p>}
-      <form action={requestMagicLink} style={{ display: "grid", gap: "0.5rem" }}>
+      {message && <p className="rounded border border-danger-border bg-danger px-3 py-2 text-danger-fg">{message}</p>}
+      <form action={requestMagicLink} className="grid gap-2">
         <label>
           Email
           <input type="email" name="email" required />

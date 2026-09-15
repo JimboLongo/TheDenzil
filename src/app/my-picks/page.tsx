@@ -35,7 +35,7 @@ export default async function MyPicksPage() {
 
   if (!current) {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>My Picks</h1>
         <p>We couldn&apos;t find a player record for your account.</p>
       </main>
@@ -45,7 +45,7 @@ export default async function MyPicksPage() {
   const { seasonEntry } = current;
   if (!seasonEntry) {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>My Picks</h1>
         <p>You&apos;re not entered in the active season.</p>
       </main>
@@ -117,11 +117,11 @@ export default async function MyPicksPage() {
   );
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 800 }}>
+    <main className="flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
       <h1>My Picks — {seasonEntry.displayName}</h1>
 
       {weekData.map(({ week: w, submission: submissionRow, picks, result }) => (
-        <section key={w.id} style={{ marginBottom: "1.5rem" }}>
+        <section key={w.id} className="border-b border-border pb-4">
           <h2>
             Week {w.number} — {w.type} ({w.status})
           </h2>
@@ -133,7 +133,7 @@ export default async function MyPicksPage() {
                 {submissionRow.isSpeedDeclared ? " — speed week declared" : ""}
               </p>
               {result && (
-                <p style={{ fontWeight: "bold" }}>
+                <p className="font-bold">
                   Result: {result.wins}-{result.losses}
                   {result.pushes > 0 ? `-${result.pushes}` : ""} —{" "}
                   {formatCents(result.grossLossCents)} lost
@@ -149,7 +149,7 @@ export default async function MyPicksPage() {
               </ul>
             </>
           ) : (
-            <p style={{ color: "#999" }}>No submission.</p>
+            <p className="text-text-muted">No submission.</p>
           )}
         </section>
       ))}

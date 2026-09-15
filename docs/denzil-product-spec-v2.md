@@ -171,6 +171,27 @@ Keep weekly winnings and awards visibly separate from standings on every screen,
 7. **Board Builder** (feature 1) — select days of week, sports, and eligible teams; pull from API; curate to the final board; publish. Publishing freezes spreads.
 8. **Override Console** (feature 3) — edit any pick, force a result, mark postponed, void a game, waive rule 12, re-run settlement. Every action writes a `ruling` row.
 
+### Verification standard **[NEW]**
+
+**Anything visual is verified by rendering it and looking at it.** Screenshot every page it touches, in **both light and dark mode**, at **mobile and desktop widths**. Not a sample of representative pages — every page the change can reach.
+
+**An HTTP 200 with the right text in it is not verification.** Curling a page, extracting its text, and diffing the numbers proves the data layer works. It proves nothing about whether a human can read the result.
+
+This is not hypothetical. Three separate shipped bugs passed text-extraction checks and were caught only by looking at the page:
+
+| Bug | What the text check saw | What the screen showed |
+|---|---|---|
+| Banner contrast | 200, correct copy | Near-black text on a light banner inside a dark page — unreadable |
+| Missing navigation | 200, correct content | Every screen a dead end; the only way back was the browser Back button |
+| Invisible form controls | 200, `<input>` present | Preflight had stripped the borders — the sign-in field rendered as blank space |
+
+Each was invisible to text extraction *by construction*: the markup was correct and the copy was right. Contrast, layout, and affordance live entirely in the rendered pixels.
+
+Two consequences worth stating plainly:
+
+- **Both themes, always.** A theme bug is 50% reproducible by definition, and the half you don't use is the half you ship broken. The token layer supports an explicit `data-theme` override precisely so the branch you aren't currently in can still be rendered and checked.
+- **Mobile is the primary width.** Most picks get made from a phone. A layout verified only at desktop width is verified for the minority case.
+
 ---
 
 ## 5. Odds & scores integration

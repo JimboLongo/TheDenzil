@@ -81,16 +81,16 @@ function GameRow({
           type="button"
           disabled={disabled}
           onClick={() => onPick(value)}
-          style={{
-            fontWeight: isSelected ? "bold" : "normal",
-            background: isSelected ? "#2563eb" : undefined,
-            color: isSelected ? "#fff" : undefined,
-          }}
+          className={`rounded border px-2 py-1 text-left disabled:opacity-40 ${
+            isSelected
+              ? "border-info-border bg-info font-bold text-info-fg"
+              : "border-border bg-surface-raised"
+          }`}
         >
           {label}
         </button>
         {isOtherSelected && (
-          <div style={{ fontSize: "0.75em", color: "#999" }}>
+          <div className="text-xs text-text-muted">
             you picked the other side
           </div>
         )}
@@ -99,13 +99,13 @@ function GameRow({
   }
 
   return (
-    <tr style={{ opacity: started ? 0.5 : 1, borderBottom: "1px solid #eee" }}>
-      <td style={{ whiteSpace: "nowrap" }}>
+    <tr className={`border-b border-border ${started ? "opacity-50" : ""}`}>
+      <td className="p-1.5 whitespace-nowrap align-top">
         {ET_DATE_FORMAT.format(g.kickoffAt)}
-        {started && <span style={{ color: "#b00020" }}> — started</span>}
+        {started && <span className="text-danger-fg"> — started</span>}
       </td>
-      <td>{renderSide(sideALabel, sideAValue)}</td>
-      <td>{renderSide(sideBLabel, sideBValue)}</td>
+      <td className="p-1.5 align-top">{renderSide(sideALabel, sideAValue)}</td>
+      <td className="p-1.5 align-top">{renderSide(sideBLabel, sideBValue)}</td>
     </tr>
   );
 }
@@ -166,13 +166,13 @@ export function PicksForm({
   })).filter((s) => s.games.length > 0);
 
   return (
-    <div style={{ display: "grid", gap: "1rem" }}>
-      <p style={{ fontWeight: "bold", fontSize: "1.1em" }}>
+    <div className="grid gap-4">
+      <p className="text-lg font-bold">
         {selectedCount} of {REQUIRED_PICKS} selected
       </p>
 
       {speedEligible && (
-        <div style={{ padding: "0.5rem 0.75rem", background: "#fff3cd" }}>
+        <div className="rounded border border-warning-border bg-warning px-3 py-2 text-warning-fg">
           <label>
             <input
               type="checkbox"
@@ -182,7 +182,7 @@ export function PicksForm({
             />{" "}
             Declare this as your speed week
           </label>
-          <div style={{ fontSize: "0.85em", color: "#666" }}>
+          <div className="text-sm opacity-80">
             {hasUsedSpeed
               ? "You've already used your speed week this season."
               : forcedSpeed
@@ -197,7 +197,7 @@ export function PicksForm({
           <h2>
             {sport} ({sportGames.length})
           </h2>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="w-full border-collapse text-sm">
             <tbody>
               {sportGames.map((g) => (
                 <GameRow
@@ -224,7 +224,7 @@ export function PicksForm({
       </div>
 
       {result && (
-        <p style={{ color: result.ok ? "#8a6d00" : "#b00020" }}>
+        <p className={result.ok ? "text-success-fg" : "text-danger-fg"}>
           {result.message}
         </p>
       )}

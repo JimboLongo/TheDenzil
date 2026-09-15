@@ -21,7 +21,7 @@ export default async function HomePage() {
 
   if (!current) {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>Welcome</h1>
         <p>
           We couldn&apos;t find a player record for your account. Contact
@@ -35,7 +35,7 @@ export default async function HomePage() {
 
   if (!seasonEntry) {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>Hi, {player.currentDisplayName}</h1>
         <p>You&apos;re not entered in the active season yet.</p>
       </main>
@@ -95,7 +95,7 @@ export default async function HomePage() {
   }
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 720 }}>
+    <main className="flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
       <h1>Welcome, {seasonEntry.displayName}</h1>
       <p>
         {currentWeek
@@ -118,27 +118,12 @@ export default async function HomePage() {
           </section>
         ) : (
           <p>
-            <Link href="/picks" style={{ fontWeight: "bold", fontSize: "1.2em" }}>
+            <Link href="/picks" className="text-lg font-bold underline underline-offset-4">
               Make your picks for Week {currentWeek.number} →
             </Link>
           </p>
         ))}
 
-      <nav style={{ display: "grid", gap: "0.5rem", marginTop: "1.5rem" }}>
-        <Link href="/standings">Standings</Link>
-        <Link href="/weekly-results">Weekly Results</Link>
-        <Link href="/league-picks">League Picks</Link>
-        {seasonEntry.role === "commish" && currentWeek && (
-          <Link href={`/commish/board/${currentWeek.id}`}>
-            Board Builder (commish)
-          </Link>
-        )}
-        {seasonEntry.role === "commish" && (
-          <Link href={`/commish/config/${seasonEntry.seasonId}`}>
-            Season Board Config (commish)
-          </Link>
-        )}
-      </nav>
     </main>
   );
 }

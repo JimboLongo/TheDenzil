@@ -36,7 +36,7 @@ export default async function PicksPage() {
 
   if (!current) {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>Make Picks</h1>
         <p>We couldn&apos;t find a player record for your account.</p>
       </main>
@@ -46,7 +46,7 @@ export default async function PicksPage() {
   const { seasonEntry } = current;
   if (!seasonEntry) {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>Make Picks</h1>
         <p>You&apos;re not entered in the active season.</p>
       </main>
@@ -57,7 +57,7 @@ export default async function PicksPage() {
 
   if (!currentWeek || currentWeek.status !== "open") {
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
+      <main className="flex flex-col gap-3 p-4 sm:p-6">
         <h1>Make Picks</h1>
         <p>There&apos;s no open week right now.</p>
       </main>
@@ -106,13 +106,13 @@ export default async function PicksPage() {
       .orderBy(asc(game.sport), asc(game.kickoffAt));
 
     return (
-      <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 720 }}>
+      <main className="flex max-w-3xl flex-col gap-3 p-4 sm:p-6">
         <h1>Week {currentWeek.number} — Your Picks</h1>
         <p>
           Submitted {ET_DATE_FORMAT.format(existingSubmission.submittedAt)}
           {existingSubmission.isSpeedDeclared ? " — speed week declared" : ""}
         </p>
-        <p style={{ fontStyle: "italic" }}>
+        <p className="italic text-text-muted">
           Picks are final. Only a commissioner can change them.
         </p>
         <ul>
@@ -165,7 +165,7 @@ export default async function PicksPage() {
     currentWeek.number === SPEED_ELIGIBLE_MAX_WEEK && !hasUsedSpeed;
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem", maxWidth: 900 }}>
+    <main className="flex max-w-5xl flex-col gap-3 p-4 sm:p-6">
       <h1>Make Picks — Week {currentWeek.number}</h1>
       <PicksForm
         weekId={currentWeek.id}

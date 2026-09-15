@@ -26,14 +26,7 @@ export function GenerateWeeksForm({
     <form
       ref={formRef}
       onSubmit={handleSubmit}
-      style={{
-        marginBottom: "1.5rem",
-        padding: "0.75rem",
-        background: "#fff3cd",
-        display: "flex",
-        gap: "0.75rem",
-        alignItems: "center",
-      }}
+      className="mb-6 flex items-center gap-3 rounded border border-warning-border bg-warning p-3 text-warning-fg"
     >
       <label>
         First Saturday of the season (week 1):{" "}
@@ -43,7 +36,7 @@ export function GenerateWeeksForm({
         Generate weeks 1-18
       </button>
       {result && (
-        <span style={{ color: result.ok ? "#8a6d00" : "#b00020" }}>
+        <span className={result.ok ? "text-success-fg" : "text-danger-fg"}>
           {result.message}
         </span>
       )}

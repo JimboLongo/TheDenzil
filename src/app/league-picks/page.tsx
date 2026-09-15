@@ -1,6 +1,5 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import Link from "next/link";
 import { db } from "@/db";
 import { game, pick, seasonEntry, submission, team } from "@/db/schema";
 import { getCurrentWeek } from "@/db/weeks";
@@ -8,6 +7,7 @@ import { getCurrentPlayer } from "@/lib/auth/getCurrentPlayer";
 import { matchupLabel, pickLabel } from "@/lib/picks/labels";
 import { canSeePick } from "@/lib/picks/reveal";
 import { gradePick } from "@/lib/settlement/grade";
+import { PageShell as Shell } from "../_components/PageShell";
 
 export const dynamic = "force-dynamic";
 
@@ -161,19 +161,17 @@ export default async function LeaguePicksPage() {
 
   return (
     <Shell>
-      <h1>
+      <h1 className="text-xl font-semibold">
         League Picks — Week {currentWeek.number}{" "}
-        <span style={{ fontWeight: "normal", fontSize: "0.6em", color: "#888" }}>
-          ({currentWeek.status})
-        </span>
+        <span className="text-sm font-normal text-text-muted">({currentWeek.status})</span>
       </h1>
 
       <p
-        style={{
-          padding: "0.6rem 0.8rem",
-          background: allSubmitted ? "#e6f4ea" : "#fff3cd",
-          border: "1px solid rgba(0,0,0,0.1)",
-        }}
+        className={`rounded border px-3 py-2 ${
+          allSubmitted
+            ? "border-success-border bg-success text-success-fg"
+            : "border-warning-border bg-warning text-warning-fg"
+        }`}
       >
         {allSubmitted
           ? `All ${entries.length} players have submitted — every pick is visible.`
@@ -183,99 +181,76 @@ export default async function LeaguePicksPage() {
       </p>
 
       {maskedCount > 0 && (
-        <p style={{ fontSize: "0.85em", color: "#666" }}>
+        <p className="text-sm text-text-muted">
           {maskedCount} pick{maskedCount === 1 ? "" : "s"} hidden from you. Hidden picks are filtered
           out on the server — they are not in this page&apos;s payload.
         </p>
       )}
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid #ccc" }}>
-            <th style={{ padding: "0.4rem" }}>Player</th>
-            <th style={{ padding: "0.4rem" }}>Submitted</th>
-            <th style={{ padding: "0.4rem" }}>Picks</th>
-          </tr>
-        </thead>
-        <tbody>
-          {grid.map((row) => (
-            <tr
-              key={row.entryId}
-              style={{
-                borderBottom: "1px solid #eee",
-                background: row.isSelf ? "rgba(37,99,235,0.08)" : undefined,
-              }}
-            >
-              <td style={{ padding: "0.4rem", whiteSpace: "nowrap", fontWeight: row.isSelf ? "bold" : "normal" }}>
-                {row.displayName}
-                {row.isSelf ? " (you)" : ""}
-              </td>
-              <td style={{ padding: "0.4rem", whiteSpace: "nowrap", color: row.submittedAt ? undefined : "#b00020" }}>
-                {row.submittedAt ? `${row.pickCount} picks` : "not yet"}
-              </td>
-              <td style={{ padding: "0.4rem" }}>
-                {row.cells.length === 0 ? (
-                  <span style={{ color: "#999" }}>—</span>
-                ) : (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                    {row.cells.map((cell, i) =>
-                      cell.visible ? (
-                        <span
-                          key={i}
-                          style={{
-                            padding: "0.15rem 0.4rem",
-                            border: "1px solid #ddd",
-                            borderLeft: `3px solid ${
-                              cell.result === "WIN"
-                                ? "#1a7f37"
-                                : cell.result === "LOSS"
-                                  ? "#b00020"
-                                  : cell.result === "PUSH"
-                                    ? "#b8860b"
-                                    : "#ccc"
-                            }`,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {cell.label}
-                        </span>
-                      ) : (
-                        <span
-                          key={i}
-                          title="Hidden until this game kicks off or everyone has submitted"
-                          style={{
-                            padding: "0.15rem 0.4rem",
-                            border: "1px dashed #bbb",
-                            color: "#999",
-                            background: "repeating-linear-gradient(45deg,#f6f6f6,#f6f6f6 4px,#efefef 4px,#efefef 8px)",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          🔒 hidden
-                        </span>
-                      ),
-                    )}
-                  </div>
-                )}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b-2 border-border-strong text-left">
+              <th className="p-1.5">Player</th>
+              <th className="p-1.5">Submitted</th>
+              <th className="p-1.5">Picks</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {grid.map((row) => (
+              <tr
+                key={row.entryId}
+                className={`border-b border-border ${row.isSelf ? "bg-row-self" : ""}`}
+              >
+                <td className={`p-1.5 whitespace-nowrap ${row.isSelf ? "font-bold" : ""}`}>
+                  {row.displayName}
+                  {row.isSelf ? " (you)" : ""}
+                </td>
+                <td
+                  className={`p-1.5 whitespace-nowrap ${row.submittedAt ? "" : "text-danger-fg"}`}
+                >
+                  {row.submittedAt ? `${row.pickCount} picks` : "not yet"}
+                </td>
+                <td className="p-1.5">
+                  {row.cells.length === 0 ? (
+                    <span className="text-text-muted">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {row.cells.map((cell, i) =>
+                        cell.visible ? (
+                          <span
+                            key={i}
+                            className={`whitespace-nowrap rounded-sm border border-border border-l-[3px] px-1.5 py-0.5 ${
+                              cell.result === "WIN"
+                                ? "border-l-success-border"
+                                : cell.result === "LOSS"
+                                  ? "border-l-danger-border"
+                                  : cell.result === "PUSH"
+                                    ? "border-l-warning-border"
+                                    : "border-l-border-strong"
+                            }`}
+                          >
+                            {cell.label}
+                          </span>
+                        ) : (
+                          <span
+                            key={i}
+                            title="Hidden until this game kicks off or everyone has submitted"
+                            className="whitespace-nowrap rounded-sm border border-dashed border-border-strong bg-surface-raised px-1.5 py-0.5 text-text-muted"
+                          >
+                            🔒 hidden
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Shell>
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
-      <nav style={{ marginBottom: "1rem", display: "flex", gap: "1rem", fontSize: "0.9em" }}>
-        <Link href="/">Home</Link>
-        <Link href="/weekly-results">Weekly Results</Link>
-        <Link href="/standings">Standings</Link>
-        <Link href="/my-picks">My Picks</Link>
-      </nav>
-      {children}
-    </main>
-  );
-}

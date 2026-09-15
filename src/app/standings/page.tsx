@@ -1,5 +1,4 @@
 import { eq, inArray } from "drizzle-orm";
-import Link from "next/link";
 import React from "react";
 import { db } from "@/db";
 import { season, seasonEntry, week, weekResult } from "@/db/schema";
@@ -8,6 +7,7 @@ import { getCurrentPlayer } from "@/lib/auth/getCurrentPlayer";
 import { formatCents } from "@/lib/picks/labels";
 import { parseSettlementConfig } from "@/lib/settlement/config";
 import { leadingGroup } from "@/lib/settlement/rates";
+import { PageShell as Shell } from "../_components/PageShell";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,21 @@ export default async function StandingsPage() {
   const viewerEntry = current.seasonEntry;
 
   const [seasonRow] = await db.select().from(season).where(eq(season.id, viewerEntry.seasonId)).limit(1);
-  const config = parseSettlementConfig(seasonRow.config);
+  // A season with no settlement config can't be scored. That's worth
+  // saying plainly rather than 500-ing at a player who just wants to see
+  // where they stand.
+  let config;
+  try {
+    config = parseSettlementConfig(seasonRow.config);
+  } catch (err) {
+    return (
+      <Shell>
+        <h1>Standings</h1>
+        <p>This season has no settlement configuration yet, so there&apos;s nothing to rank.</p>
+        <p className="text-sm text-text-muted">{(err as Error).message}</p>
+      </Shell>
+    );
+  }
 
   const entries = await db.select().from(seasonEntry).where(eq(seasonEntry.seasonId, viewerEntry.seasonId));
   const weeks = await db.select().from(week).where(eq(week.seasonId, viewerEntry.seasonId));
@@ -127,122 +141,97 @@ export default async function StandingsPage() {
 
   return (
     <Shell>
-      <h1>Standings</h1>
-      <p style={{ color: "#666", fontSize: "0.9em" }}>
+      <h1 className="text-xl font-semibold">Standings</h1>
+      <p className="text-sm text-text-muted">
         {settledWeekIds.size} of {weeks.length} weeks settled
         {currentWeek ? ` · current week ${currentWeek.number} (${currentWeek.status})` : ""}
       </p>
 
       {settledWeekIds.size === 0 && (
-        <p style={{ padding: "0.6rem 0.8rem", background: "#fff3cd" }}>
+        <p className="rounded border border-warning-border bg-warning px-3 py-2 text-warning-fg">
           No weeks have been settled yet, so every figure below is zero.
         </p>
       )}
 
-      <p style={{ fontSize: "0.85em", color: "#666" }}>
-        Rank is by <strong>cumulative dollars lost only</strong>. Weekly winnings and awards are shown
-        separately and do not affect rank.
+      <p className="text-sm text-text-muted">
+        Rank is by <strong className="text-text">cumulative dollars lost only</strong>. Weekly winnings
+        and awards are shown separately and do not affect rank.
       </p>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "2px solid #ccc" }}>
-            <th style={{ padding: "0.4rem" }}>Rank</th>
-            <th style={{ padding: "0.4rem" }}>Player</th>
-            <th style={{ padding: "0.4rem", textAlign: "right" }}>Lost (ranks on this)</th>
-            <th style={{ padding: "0.4rem", textAlign: "right", color: "#666" }}>Weekly wins</th>
-            <th style={{ padding: "0.4rem", textAlign: "right", color: "#666" }}>Weekly winnings</th>
-            <th style={{ padding: "0.4rem", textAlign: "right", color: "#666" }}>Denzils</th>
-            <th style={{ padding: "0.4rem", textAlign: "right", color: "#666" }}>Award $</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ranked.map((r, i) => (
-            <React.Fragment key={r.entryId}>
-              <tr
-                style={{
-                  borderBottom: "1px solid #eee",
-                  background: r.isSelf ? "rgba(37,99,235,0.08)" : undefined,
-                }}
-              >
-                <td style={{ padding: "0.4rem" }}>{r.rank}</td>
-                <td style={{ padding: "0.4rem", fontWeight: r.isSelf ? "bold" : "normal" }}>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b-2 border-border-strong text-left">
+              <th className="p-1.5">Rank</th>
+              <th className="p-1.5">Player</th>
+              <th className="p-1.5 text-right">Lost (ranks on this)</th>
+              <th className="p-1.5 text-right text-text-muted">Weekly wins</th>
+              <th className="p-1.5 text-right text-text-muted">Weekly winnings</th>
+              <th className="p-1.5 text-right text-text-muted">Denzils</th>
+              <th className="p-1.5 text-right text-text-muted">Award $</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranked.map((r, i) => (
+              <React.Fragment key={r.entryId}>
+                <tr className={`border-b border-border ${r.isSelf ? "bg-row-self" : ""}`}>
+                  <td className="p-1.5">{r.rank}</td>
+                  <td className={`p-1.5 ${r.isSelf ? "font-bold" : ""}`}>
+                    {r.displayName}
+                    {r.isSelf ? " (you)" : ""}
+                  </td>
+                  <td className="p-1.5 text-right font-bold tabular-nums">
+                    {formatCents(r.cumulativeGrossLossCents)}
+                  </td>
+                  <td className="p-1.5 text-right text-text-muted">{r.weeklyWins || "—"}</td>
+                  <td className="p-1.5 text-right text-text-muted tabular-nums">
+                    {r.weeklyWinningsCents ? formatCents(r.weeklyWinningsCents) : "—"}
+                  </td>
+                  <td className="p-1.5 text-right text-text-muted">{r.denzilCount || "—"}</td>
+                  <td className="p-1.5 text-right text-text-muted tabular-nums">
+                    {r.denzilCents ? formatCents(r.denzilCents) : "—"}
+                  </td>
+                </tr>
+                {showCutoff && i + 1 === cutoffAfterIndex && (
+                  <tr>
+                    <td colSpan={7} className="p-0">
+                      <div className="border-t-[3px] border-double border-danger-border bg-danger px-2 py-1 text-xs text-danger-fg">
+                        {`── handicap cutoff ── the ${cutoffAfterIndex} player${cutoffAfterIndex === 1 ? "" : "s"} above pay `}
+                        {formatCents(config.leaderLossCents)}/loss in week {currentWeek!.number}
+                        {cutoffAfterIndex > config.leaderCount &&
+                          ` (${cutoffAfterIndex}, not ${config.leaderCount} — everyone tied at ${config.leaderCount}th is included)`}
+                        ; everyone below pays {formatCents(config.baseLossCents)}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+
+            {unranked.map((r) => (
+              <tr key={r.entryId} className="border-b border-border text-text-muted">
+                <td className="p-1.5">—</td>
+                <td className="p-1.5">
                   {r.displayName}
-                  {r.isSelf ? " (you)" : ""}
+                  {r.isSelf ? " (you)" : ""} <span className="text-xs">(not Season Pool eligible)</span>
                 </td>
-                <td style={{ padding: "0.4rem", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: "bold" }}>
+                <td className="p-1.5 text-right tabular-nums">
                   {formatCents(r.cumulativeGrossLossCents)}
                 </td>
-                <td style={{ padding: "0.4rem", textAlign: "right", color: "#666" }}>{r.weeklyWins || "—"}</td>
-                <td style={{ padding: "0.4rem", textAlign: "right", color: "#666", fontVariantNumeric: "tabular-nums" }}>
+                <td className="p-1.5 text-right">{r.weeklyWins || "—"}</td>
+                <td className="p-1.5 text-right tabular-nums">
                   {r.weeklyWinningsCents ? formatCents(r.weeklyWinningsCents) : "—"}
                 </td>
-                <td style={{ padding: "0.4rem", textAlign: "right", color: "#666" }}>{r.denzilCount || "—"}</td>
-                <td style={{ padding: "0.4rem", textAlign: "right", color: "#666", fontVariantNumeric: "tabular-nums" }}>
+                <td className="p-1.5 text-right">{r.denzilCount || "—"}</td>
+                <td className="p-1.5 text-right tabular-nums">
                   {r.denzilCents ? formatCents(r.denzilCents) : "—"}
                 </td>
               </tr>
-              {showCutoff && i + 1 === cutoffAfterIndex && (
-                <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
-                    <div
-                      style={{
-                        borderTop: "3px double #b00020",
-                        color: "#b00020",
-                        fontSize: "0.8em",
-                        padding: "0.25rem 0.4rem",
-                        background: "rgba(176,0,32,0.05)",
-                      }}
-                    >
-                      {`── handicap cutoff ── the ${cutoffAfterIndex} player${cutoffAfterIndex === 1 ? "" : "s"} above pay `}
-                      {formatCents(config.leaderLossCents)}/loss in week {currentWeek!.number}
-                      {cutoffAfterIndex > config.leaderCount &&
-                        ` (${cutoffAfterIndex}, not ${config.leaderCount} — everyone tied at ${config.leaderCount}th is included)`}
-                      ; everyone below pays {formatCents(config.baseLossCents)}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
-
-          {unranked.map((r) => (
-            <tr key={r.entryId} style={{ borderBottom: "1px solid #eee", color: "#999" }}>
-              <td style={{ padding: "0.4rem" }}>—</td>
-              <td style={{ padding: "0.4rem" }}>
-                {r.displayName}
-                {r.isSelf ? " (you)" : ""}{" "}
-                <span style={{ fontSize: "0.8em" }}>(not Season Pool eligible)</span>
-              </td>
-              <td style={{ padding: "0.4rem", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {formatCents(r.cumulativeGrossLossCents)}
-              </td>
-              <td style={{ padding: "0.4rem", textAlign: "right" }}>{r.weeklyWins || "—"}</td>
-              <td style={{ padding: "0.4rem", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {r.weeklyWinningsCents ? formatCents(r.weeklyWinningsCents) : "—"}
-              </td>
-              <td style={{ padding: "0.4rem", textAlign: "right" }}>{r.denzilCount || "—"}</td>
-              <td style={{ padding: "0.4rem", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                {r.denzilCents ? formatCents(r.denzilCents) : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Shell>
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main style={{ fontFamily: "sans-serif", padding: "1.5rem" }}>
-      <nav style={{ marginBottom: "1rem", display: "flex", gap: "1rem", fontSize: "0.9em" }}>
-        <Link href="/">Home</Link>
-        <Link href="/league-picks">League Picks</Link>
-        <Link href="/weekly-results">Weekly Results</Link>
-        <Link href="/my-picks">My Picks</Link>
-      </nav>
-      {children}
-    </main>
-  );
-}

@@ -1,26 +1,214 @@
 @import "tailwindcss";
 
+/**
+ * Semantic colour tokens.
+ *
+ * Raw values live exactly once, in the two palettes below. The semantic
+ * tokens then point at a palette entry, so a colour can never drift
+ * between light and dark — only the mapping is repeated, never a hex.
+ *
+ * Theme selection: prefers-color-scheme by default, with an explicit
+ * `data-theme="light" | "dark"` on <html> able to override it. The
+ * override is what makes both themes verifiable without touching the
+ * machine's appearance setting, and leaves room for a user toggle.
+ *
+ * Nothing outside this file should contain a raw colour.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light palette */
+  --l-surface: #ffffff;
+  --l-surface-raised: #f5f6f8;
+  --l-text: #16181d;
+  --l-text-muted: #5b616e;
+  --l-border: #d9dce1;
+  --l-border-strong: #b6bcc6;
+  --l-info: #eaf1ff;
+  --l-info-fg: #16305c;
+  --l-info-border: #bcd2f7;
+  --l-success: #e7f5ec;
+  --l-success-fg: #10431f;
+  --l-success-border: #b4dfc3;
+  --l-warning: #fdf3d7;
+  --l-warning-fg: #4d3a05;
+  --l-warning-border: #ecd48a;
+  --l-danger: #fdeaea;
+  --l-danger-fg: #5d1013;
+  --l-danger-border: #f2bcbc;
+  --l-row-self: #eef3fd;
+  --l-row-winner: #e9f6ee;
+
+  /* Dark palette */
+  --d-surface: #0b0d10;
+  --d-surface-raised: #15181d;
+  --d-text: #e9eaee;
+  --d-text-muted: #9aa1ad;
+  --d-border: #2a2f37;
+  --d-border-strong: #3d4450;
+  --d-info: #13233d;
+  --d-info-fg: #cfe0ff;
+  --d-info-border: #294878;
+  --d-success: #10291a;
+  --d-success-fg: #bfe9cd;
+  --d-success-border: #23543a;
+  --d-warning: #2e2508;
+  --d-warning-fg: #f2dfa4;
+  --d-warning-border: #5c4a12;
+  --d-danger: #301214;
+  --d-danger-fg: #f8c6c6;
+  --d-danger-border: #63252a;
+  --d-row-self: #131a27;
+  --d-row-winner: #10231a;
+
+  /* Semantic tokens — light by default */
+  color-scheme: light;
+  --surface: var(--l-surface);
+  --surface-raised: var(--l-surface-raised);
+  --text: var(--l-text);
+  --text-muted: var(--l-text-muted);
+  --border: var(--l-border);
+  --border-strong: var(--l-border-strong);
+  --info: var(--l-info);
+  --info-fg: var(--l-info-fg);
+  --info-border: var(--l-info-border);
+  --success: var(--l-success);
+  --success-fg: var(--l-success-fg);
+  --success-border: var(--l-success-border);
+  --warning: var(--l-warning);
+  --warning-fg: var(--l-warning-fg);
+  --warning-border: var(--l-warning-border);
+  --danger: var(--l-danger);
+  --danger-fg: var(--l-danger-fg);
+  --danger-border: var(--l-danger-border);
+  --row-self: var(--l-row-self);
+  --row-winner: var(--l-row-winner);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: var(--d-surface);
+    --surface-raised: var(--d-surface-raised);
+    --text: var(--d-text);
+    --text-muted: var(--d-text-muted);
+    --border: var(--d-border);
+    --border-strong: var(--d-border-strong);
+    --info: var(--d-info);
+    --info-fg: var(--d-info-fg);
+    --info-border: var(--d-info-border);
+    --success: var(--d-success);
+    --success-fg: var(--d-success-fg);
+    --success-border: var(--d-success-border);
+    --warning: var(--d-warning);
+    --warning-fg: var(--d-warning-fg);
+    --warning-border: var(--d-warning-border);
+    --danger: var(--d-danger);
+    --danger-fg: var(--d-danger-fg);
+    --danger-border: var(--d-danger-border);
+    --row-self: var(--d-row-self);
+    --row-winner: var(--d-row-winner);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: var(--d-surface);
+  --surface-raised: var(--d-surface-raised);
+  --text: var(--d-text);
+  --text-muted: var(--d-text-muted);
+  --border: var(--d-border);
+  --border-strong: var(--d-border-strong);
+  --info: var(--d-info);
+  --info-fg: var(--d-info-fg);
+  --info-border: var(--d-info-border);
+  --success: var(--d-success);
+  --success-fg: var(--d-success-fg);
+  --success-border: var(--d-success-border);
+  --warning: var(--d-warning);
+  --warning-fg: var(--d-warning-fg);
+  --warning-border: var(--d-warning-border);
+  --danger: var(--d-danger);
+  --danger-fg: var(--d-danger-fg);
+  --danger-border: var(--d-danger-border);
+  --row-self: var(--d-row-self);
+  --row-winner: var(--d-row-winner);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-border: var(--info-border);
+
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-border: var(--success-border);
+
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-border: var(--warning-border);
+
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-border: var(--danger-border);
+
+  --color-row-self: var(--row-self);
+  --color-row-winner: var(--row-winner);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/**
+ * Base form-control chrome. Tailwind's preflight strips borders and
+ * backgrounds from buttons and inputs, which leaves them invisible
+ * against the page — a bare text input reads as plain text. Utility
+ * classes on a specific control still win over these.
+ */
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button {
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--surface-raised);
+    color: var(--text);
+    padding: 0.2rem 0.6rem;
+  }
+
+  button:disabled {
+    opacity: 0.5;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="date"],
+  input[type="search"],
+  input[type="number"],
+  select,
+  textarea {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface-raised);
+    color: var(--text);
+    padding: 0.2rem 0.4rem;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--info-border);
+    outline-offset: 1px;
+  }
 }
