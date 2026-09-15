@@ -30,12 +30,58 @@ export type BoardGame = {
   awayName: string;
 };
 
-function spreadLabels(g: BoardGame): { home: string; away: string } {
+type Side = {
+  value: PickSelection;
+  /** Plain text, for anywhere that needs a string rather than nodes. */
+  text: string;
+  node: React.ReactNode;
+};
+
+function spreadSide(g: BoardGame, side: "HOME" | "AWAY"): Side {
   const n = g.spread ?? "?";
-  const homeIsFavorite = g.favoriteTeamId === g.homeTeamId;
+  const isHome = side === "HOME";
+  const team = isHome ? g.homeName : g.awayName;
+  const isFavorite = isHome === (g.favoriteTeamId === g.homeTeamId);
+  const line = `${isFavorite ? "-" : "+"}${n}`;
   return {
-    home: `${g.homeName} ${homeIsFavorite ? "-" : "+"}${n}`,
-    away: `${g.awayName} ${homeIsFavorite ? "+" : "-"}${n}`,
+    value: side,
+    text: `${team} ${line}`,
+    node: (
+      <>
+        <span className="whitespace-nowrap">{team}</span>{" "}
+        <span className="whitespace-nowrap">{line}</span>
+      </>
+    ),
+  };
+}
+
+/**
+ * Totals carry the matchup in the button text, because "Over 44.5" on its
+ * own says nothing — on a submitted slip, or anywhere a pick is shown out
+ * of context, it has to stand alone. A slash rather than "@" since a total
+ * isn't home/away directional.
+ *
+ * Wrapping: each team name is nowrap so it can never break mid-name, and
+ * the only break opportunity inside the matchup is the <wbr> after the
+ * slash. Team names contain spaces, so without this the browser would
+ * happily split "Southern Mississippi Golden Eagles" across two lines.
+ */
+function totalSide(g: BoardGame, side: "OVER" | "UNDER"): Side {
+  const total = g.totalPoints ?? "?";
+  const direction = side === "OVER" ? "Over" : "Under";
+  return {
+    value: side,
+    text: `${g.awayName}/${g.homeName} - ${direction} ${total}`,
+    node: (
+      <>
+        <span className="whitespace-nowrap">{g.awayName}/</span>
+        <wbr />
+        <span className="whitespace-nowrap">{g.homeName}</span>{" "}
+        <span className="whitespace-nowrap">
+          - {direction} {total}
+        </span>
+      </>
+    ),
   };
 }
 
@@ -61,20 +107,14 @@ function GameRow({
 }) {
   const started = g.kickoffAt <= now;
 
-  const sides: { label: string; value: PickSelection }[] =
+  const sides: Side[] =
     g.market === "SPREAD"
-      ? [
-          { label: spreadLabels(g).away, value: "AWAY" },
-          { label: spreadLabels(g).home, value: "HOME" },
-        ]
-      : [
-          { label: `Over ${g.totalPoints ?? "?"}`, value: "OVER" },
-          { label: `Under ${g.totalPoints ?? "?"}`, value: "UNDER" },
-        ];
+      ? [spreadSide(g, "AWAY"), spreadSide(g, "HOME")]
+      : [totalSide(g, "OVER"), totalSide(g, "UNDER")];
 
   return (
     <li
-      className={`grid gap-2 border-b border-border py-3 sm:grid-cols-[1fr_18rem] sm:items-center sm:gap-6 ${
+      className={`grid gap-1 border-b border-border py-3 sm:grid-cols-[1fr_20rem] sm:items-center sm:gap-6 ${
         started ? "opacity-50" : ""
       }`}
     >
@@ -89,7 +129,7 @@ function GameRow({
       </div>
 
       <div className="flex flex-col gap-1">
-        {sides.map(({ label, value }) => {
+        {sides.map(({ node, text, value }) => {
           const isSelected = selection === value;
           const isOtherSelected = Boolean(selection) && selection !== value;
           return (
@@ -98,20 +138,20 @@ function GameRow({
               type="button"
               disabled={started || isOtherSelected}
               onClick={() => onPick(value)}
-              title={isOtherSelected ? "You picked the other side of this game" : undefined}
+              title={isOtherSelected ? "You picked the other side of this game" : text}
               className={`min-h-10 w-full rounded border px-3 py-1.5 text-left disabled:opacity-40 ${
                 isSelected
                   ? "border-info-border bg-info font-bold text-info-fg"
                   : "border-border bg-surface-raised"
               }`}
             >
-              {label}
+              {node}
             </button>
           );
         })}
         {selection && (
           <p className="text-xs text-text-muted">
-            Picked {sides.find((s) => s.value === selection)?.label} — tap it again to clear.
+            Picked {sides.find((s) => s.value === selection)?.text} — tap it again to clear.
           </p>
         )}
       </div>
