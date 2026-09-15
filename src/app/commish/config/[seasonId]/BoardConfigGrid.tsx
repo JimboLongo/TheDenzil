@@ -203,9 +203,9 @@ export function BoardConfigGrid({
   const weeks1to17 = allWeekNumbers.filter((n) => n !== TOTAL_WEEKS);
 
   return (
-    <div className="grid gap-6">
-      <section className="flex flex-wrap gap-8">
-        <fieldset className="max-w-[420px] rounded border border-border p-3">
+    <div className="grid grid-cols-1 gap-6">
+      <section className="flex flex-col gap-6 sm:flex-row sm:flex-wrap sm:gap-8">
+        <fieldset className="min-w-0 rounded border border-border p-3 sm:max-w-[420px] sm:flex-1">
           <legend>NFL teams ({nflTeamIds.size} of {nflTeams.length})</legend>
           <div className="mb-1.5">
             <button type="button" onClick={() => setNflTeamIds(new Set(nflTeams.map((t) => t.id)))}>
@@ -216,7 +216,7 @@ export function BoardConfigGrid({
             </button>
           </div>
           <div
-            className="grid max-h-[220px] grid-cols-2 gap-x-4 gap-y-0.5 overflow-y-auto"
+            className="grid max-h-[220px] grid-cols-1 gap-x-4 gap-y-0.5 overflow-y-auto sm:grid-cols-2"
           >
             {nflTeams.map((t) => (
               <label key={t.id} className="text-sm">
@@ -231,17 +231,17 @@ export function BoardConfigGrid({
           </div>
         </fieldset>
 
-        <fieldset className="max-w-[420px] rounded border border-border p-3">
+        <fieldset className="min-w-0 rounded border border-border p-3 sm:max-w-[420px] sm:flex-1">
           <legend>
             NCAA teams ({ncaaTeamIds.size} of {ncaaTeams.length})
           </legend>
-          <div className="mb-1.5">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <input
               type="text"
               placeholder="Search teams…"
               value={ncaaFilter}
               onChange={(e) => setNcaaFilter(e.target.value)}
-              className="mr-2 rounded border border-border bg-surface-raised px-1"
+              className="min-w-0 flex-1 rounded border border-border bg-surface-raised px-1"
             />
             <button type="button" onClick={() => setNcaaTeamIds(new Set(ncaaTeams.map((t) => t.id)))}>
               All
@@ -251,7 +251,7 @@ export function BoardConfigGrid({
             </button>
           </div>
           <div
-            className="grid max-h-[220px] grid-cols-2 gap-x-4 gap-y-0.5 overflow-y-auto"
+            className="grid max-h-[220px] grid-cols-1 gap-x-4 gap-y-0.5 overflow-y-auto sm:grid-cols-2"
           >
             {filteredNcaaTeams.map((t) => (
               <label key={t.id} className="text-sm">
@@ -282,7 +282,7 @@ export function BoardConfigGrid({
           ))}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b-2 border-border-strong text-left">

@@ -202,7 +202,7 @@ export function RulesEditor({
   }
 
   return (
-    <form ref={formRef} className="grid gap-6">
+    <form ref={formRef} className="grid grid-cols-1 gap-6">
       <section>
         <h2>Board rules</h2>
         {SPORT_ORDER.map((sport) => {
