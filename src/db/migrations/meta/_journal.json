@@ -78,6 +78,13 @@
       "when": 1789497917630,
       "tag": "0010_team_is_fixture",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789518766170,
+      "tag": "0011_week_schedule",
+      "breakpoints": true
     }
   ]
 }

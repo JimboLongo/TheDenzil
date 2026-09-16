@@ -58,5 +58,9 @@ export default auth(async (req) => {
 });
 
 export const config = {
-  matcher: ["/((?!api/auth|login|_next/static|_next/image|favicon.ico).*)"],
+  // api/cron is excluded because those routes authenticate with a
+  // CRON_SECRET bearer token instead of a player session — running them
+  // through the session proxy would just redirect Vercel's scheduler to
+  // /login.
+  matcher: ["/((?!api/auth|api/cron|login|_next/static|_next/image|favicon.ico).*)"],
 };

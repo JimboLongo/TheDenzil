@@ -197,7 +197,15 @@ export const week = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     linesPublishedAt: timestamp("lines_published_at", { withTimezone: true }),
+    // Scheduled: when spreads freeze for this week. Defaults from season
+    // config, editable per week (bowl weeks need an earlier snapshot).
     lineSnapshotAt: timestamp("line_snapshot_at", { withTimezone: true }),
+    // Recorded: when the snapshot actually ran. Separate from the
+    // schedule so the hourly cron knows what it has already done and
+    // doesn't re-snapshot a week every hour after its time passes.
+    snapshotTakenAt: timestamp("snapshot_taken_at", { withTimezone: true }),
+    // Scheduled: when the board should go live to players.
+    publishAt: timestamp("publish_at", { withTimezone: true }),
     isSpeedWeekForAll: boolean("is_speed_week_for_all")
       .notNull()
       .default(false),

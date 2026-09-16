@@ -1,13 +1,15 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { createManualGame } from "@/db/games";
-import { boardOverride, game, ruling, week, weekBoardConfig } from "@/db/schema";
+import { boardOverride, game, ruling, team, week, weekBoardConfig } from "@/db/schema";
 import type { Sport } from "@/db/teams";
 import { requireCommish } from "@/lib/auth/getCurrentPlayer";
 import { computeBoard } from "@/lib/board/computeBoard";
+import { publishWeek } from "@/lib/board/publishWeek";
 import type { BoardRule, Market, OverrideAction } from "@/lib/board/rules";
 import { takeSnapshot } from "@/lib/odds/snapshotBoard";
 
@@ -88,82 +90,24 @@ export async function publishBoardAction(
 ): Promise<PublishResult> {
   await requireCommish();
 
+  // Publish always operates on the rules currently shown in the editor
+  // (saved here first), so the frozen board matches the live preview the
+  // commissioner just looked at. The guards themselves live in
+  // publishWeek(), shared with the publish cron.
   const [weekRow] = await db
-    .select({
-      linesPublishedAt: week.linesPublishedAt,
-      seasonId: week.seasonId,
-    })
+    .select({ linesPublishedAt: week.linesPublishedAt })
     .from(week)
     .where(eq(week.id, weekId))
     .limit(1);
 
-  if (!weekRow) {
-    return { ok: false, message: "Week not found." };
+  if (weekRow && !weekRow.linesPublishedAt) {
+    await saveRules(weekId, parseRulesFromFormData(formData));
   }
 
-  if (weekRow.linesPublishedAt) {
-    return { ok: false, message: "Board is already published." };
-  }
-
-  // App-level guard mirroring the DB's partial unique index
-  // (week_one_open_per_season) — two open weeks means players can
-  // submit against the wrong one.
-  const [otherOpenWeek] = await db
-    .select({ id: week.id, number: week.number })
-    .from(week)
-    .where(and(eq(week.seasonId, weekRow.seasonId), eq(week.status, "open")))
-    .limit(1);
-
-  if (otherOpenWeek) {
-    return {
-      ok: false,
-      message: `Week ${otherOpenWeek.number} is already open for this season — close it before opening another.`,
-    };
-  }
-
-  // Publish always operates on the rules currently shown in the editor
-  // (saved here first), so the frozen board matches the live preview
-  // the commissioner just looked at.
-  await saveRules(weekId, parseRulesFromFormData(formData));
-
-  const includedIds = await computeBoard(weekId);
-
-  if (includedIds.length === 0) {
-    // A published board with zero games is a week nobody can submit
-    // picks for — and it would be discovered Saturday morning.
-    revalidatePath(`/commish/board/${weekId}`);
-    return {
-      ok: false,
-      message:
-        "Board is empty — no game matches your rules or overrides. Add a rule, an override, or a manual game before publishing.",
-    };
-  }
-
-  const includedSet = new Set(includedIds);
-
-  const weekGames = await db
-    .select({ id: game.id })
-    .from(game)
-    .where(eq(game.weekId, weekId));
-
-  const onIds = weekGames.filter((g) => includedSet.has(g.id)).map((g) => g.id);
-  const offIds = weekGames.filter((g) => !includedSet.has(g.id)).map((g) => g.id);
-
-  if (onIds.length > 0) {
-    await db.update(game).set({ isOnBoard: true }).where(inArray(game.id, onIds));
-  }
-  if (offIds.length > 0) {
-    await db.update(game).set({ isOnBoard: false }).where(inArray(game.id, offIds));
-  }
-
-  await db
-    .update(week)
-    .set({ linesPublishedAt: new Date(), status: "open" })
-    .where(eq(week.id, weekId));
-
+  const outcome = await publishWeek(weekId);
   revalidatePath(`/commish/board/${weekId}`);
 
-  return { ok: true, message: null };
+  return outcome.ok ? { ok: true, message: null } : { ok: false, message: outcome.message };
 }
 
 export async function setOverrideAction(
@@ -248,6 +192,174 @@ export async function createManualGameAction(
     spread: spreadRaw ? Number(spreadRaw) : null,
     totalPoints: totalPointsRaw ? Number(totalPointsRaw) : null,
   });
+
+  revalidatePath(`/commish/board/${weekId}`);
+}
+
+// ---------------------------------------------------------------------
+// Board builder: week switching, schedule, override clearing
+// ---------------------------------------------------------------------
+export type BoardGameRow = {
+  id: number;
+  sport: Sport;
+  market: Market;
+  kickoffAt: Date;
+  spread: string | null;
+  totalPoints: string | null;
+  homeName: string;
+  awayName: string;
+  favoriteIsHome: boolean;
+  /** What the rules + overrides currently say. */
+  included: boolean;
+  /** Set when this game's state comes from an override rather than the rules. */
+  override: OverrideAction | null;
+  /** What was frozen onto the game row at publish time. */
+  isOnBoard: boolean;
+};
+
+export type WeekBoardData = {
+  weekId: number;
+  number: number;
+  type: string;
+  status: string;
+  linesPublishedAt: Date | null;
+  lineSnapshotAt: Date | null;
+  snapshotTakenAt: Date | null;
+  publishAt: Date | null;
+  rules: BoardRule[];
+  games: BoardGameRow[];
+};
+
+export async function loadWeekBoardAction(weekId: number): Promise<WeekBoardData> {
+  await requireCommish();
+  return loadWeekBoard(weekId);
+}
+
+/** Shared by the action and the page's initial server render. */
+export async function loadWeekBoard(weekId: number): Promise<WeekBoardData> {
+  const [weekRow] = await db.select().from(week).where(eq(week.id, weekId)).limit(1);
+  if (!weekRow) throw new Error(`Week ${weekId} not found`);
+
+  const homeTeam = alias(team, "home_team");
+  const awayTeam = alias(team, "away_team");
+
+  const rows = await db
+    .select({
+      id: game.id,
+      sport: game.sport,
+      market: game.market,
+      kickoffAt: game.kickoffAt,
+      spread: game.spread,
+      totalPoints: game.totalPoints,
+      homeTeamId: game.homeTeamId,
+      favoriteTeamId: game.favoriteTeamId,
+      isOnBoard: game.isOnBoard,
+      homeName: homeTeam.canonicalName,
+      awayName: awayTeam.canonicalName,
+    })
+    .from(game)
+    .innerJoin(homeTeam, eq(game.homeTeamId, homeTeam.id))
+    .innerJoin(awayTeam, eq(game.awayTeamId, awayTeam.id))
+    .where(eq(game.weekId, weekId))
+    .orderBy(asc(game.kickoffAt), asc(game.id));
+
+  const [config] = await db
+    .select()
+    .from(weekBoardConfig)
+    .where(eq(weekBoardConfig.weekId, weekId))
+    .limit(1);
+
+  const overrideRows = await db
+    .select()
+    .from(boardOverride)
+    .where(eq(boardOverride.weekId, weekId));
+  const overrides = new Map(overrideRows.map((o) => [o.gameId, o.action]));
+
+  const includedIds = new Set(await computeBoard(weekId));
+
+  return {
+    weekId,
+    number: weekRow.number,
+    type: weekRow.type,
+    status: weekRow.status,
+    linesPublishedAt: weekRow.linesPublishedAt,
+    lineSnapshotAt: weekRow.lineSnapshotAt,
+    snapshotTakenAt: weekRow.snapshotTakenAt,
+    publishAt: weekRow.publishAt,
+    rules: (config?.rules as BoardRule[] | undefined) ?? [],
+    games: rows.map((r) => ({
+      id: r.id,
+      sport: r.sport,
+      market: r.market,
+      kickoffAt: r.kickoffAt,
+      spread: r.spread,
+      totalPoints: r.totalPoints,
+      homeName: r.homeName,
+      awayName: r.awayName,
+      favoriteIsHome: r.favoriteTeamId === r.homeTeamId,
+      included: includedIds.has(r.id),
+      override: overrides.get(r.id) ?? null,
+      isOnBoard: r.isOnBoard,
+    })),
+  };
+}
+
+export type ScheduleResult = { ok: boolean; message: string };
+
+/** Per-week schedule. Empty string clears a field back to unset. */
+export async function saveScheduleAction(
+  weekId: number,
+  lineSnapshotAtRaw: string,
+  publishAtRaw: string,
+): Promise<ScheduleResult> {
+  await requireCommish();
+
+  const parse = (raw: string, label: string): Date | null | { error: string } => {
+    if (!raw.trim()) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? { error: `${label} is not a valid date.` } : d;
+  };
+
+  const snapshotAt = parse(lineSnapshotAtRaw, "Line snapshot");
+  if (snapshotAt && "error" in snapshotAt) return { ok: false, message: snapshotAt.error };
+  const publishAt = parse(publishAtRaw, "Publish");
+  if (publishAt && "error" in publishAt) return { ok: false, message: publishAt.error };
+
+  await db
+    .update(week)
+    .set({ lineSnapshotAt: snapshotAt, publishAt })
+    .where(eq(week.id, weekId));
+
+  revalidatePath(`/commish/board/${weekId}`);
+  return { ok: true, message: "Schedule saved." };
+}
+
+/** Drops an override so the game goes back to whatever the rules say. */
+export async function clearOverrideAction(weekId: number, gameId: number) {
+  const current = await requireCommish();
+
+  await db
+    .delete(boardOverride)
+    .where(and(eq(boardOverride.weekId, weekId), eq(boardOverride.gameId, gameId)));
+
+  const [weekRow] = await db
+    .select({ linesPublishedAt: week.linesPublishedAt })
+    .from(week)
+    .where(eq(week.id, weekId))
+    .limit(1);
+
+  if (weekRow?.linesPublishedAt) {
+    // Past publish the frozen board has to be corrected immediately, and
+    // that leaves an audit trail like any other post-publish change.
+    const included = new Set(await computeBoard(weekId));
+    await db.update(game).set({ isOnBoard: included.has(gameId) }).where(eq(game.id, gameId));
+    await db.insert(ruling).values({
+      weekId,
+      type: "board_override_cleared",
+      description: `Cleared override on game ${gameId}; board membership back to rules`,
+      appliedBy: current.player.id,
+    });
+  }
 
   revalidatePath(`/commish/board/${weekId}`);
 }

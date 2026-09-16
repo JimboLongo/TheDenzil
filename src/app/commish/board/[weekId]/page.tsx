@@ -2,42 +2,27 @@ import { asc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { boardOverride, game, team, week, weekBoardConfig } from "@/db/schema";
+import { boardOverride, game, team, week } from "@/db/schema";
 import type { Sport } from "@/db/teams";
-import { boardSizeWarning, type BoardRule } from "@/lib/board/rules";
+import { BoardBuilder, type WeekOption } from "./BoardBuilder";
 import { RulesEditor, type GameRow } from "./RulesEditor";
 import {
-  createManualGameAction,
+  clearOverrideAction,
+  loadWeekBoard,
+  loadWeekBoardAction,
   publishBoardAction,
   saveRulesAction,
+  saveScheduleAction,
   setOverrideAction,
-  takeSnapshotAction,
 } from "./actions";
 
-const SPORT_ORDER: Sport[] = ["NFL", "NCAA", "CFL"];
+export const dynamic = "force-dynamic";
 
-const ET_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZoneName: "short",
-});
-
-function formatLine(row: {
-  market: "SPREAD" | "TOTAL";
-  spread: string | null;
-  totalPoints: string | null;
-  favoriteName: string | null;
-}): string {
-  if (row.market === "SPREAD") {
-    return `${row.favoriteName ?? "?"} -${row.spread ?? "?"}`;
-  }
-  return `O/U ${row.totalPoints ?? "?"}`;
-}
-
+/**
+ * Board Builder. The week selector switches weeks through a server action
+ * rather than a route change, so the URL stays put — the weekId in the
+ * path is only the entry point.
+ */
 export default async function BoardPage({
   params,
 }: {
@@ -45,21 +30,23 @@ export default async function BoardPage({
 }) {
   const { weekId: weekIdParam } = await params;
   const weekId = Number(weekIdParam);
+  if (!Number.isInteger(weekId)) notFound();
 
-  if (!Number.isInteger(weekId)) {
-    notFound();
-  }
+  const [weekRow] = await db.select().from(week).where(eq(week.id, weekId)).limit(1);
+  if (!weekRow) notFound();
 
-  const [weekRow] = await db
-    .select()
+  const weekRows = await db
+    .select({ id: week.id, number: week.number, status: week.status, type: week.type })
     .from(week)
-    .where(eq(week.id, weekId))
-    .limit(1);
+    .where(eq(week.seasonId, weekRow.seasonId))
+    .orderBy(asc(week.number));
+  const weeks: WeekOption[] = weekRows;
 
-  if (!weekRow) {
-    notFound();
-  }
+  const initial = await loadWeekBoard(weekId);
 
+  // The rules editor keeps its own shape; it's rendered collapsed inside
+  // the builder, since filters are the bulk tool and the per-game
+  // checkboxes are for exceptions to them.
   const homeTeam = alias(team, "home_team");
   const awayTeam = alias(team, "away_team");
   const favoriteTeam = alias(team, "favorite_team");
@@ -68,14 +55,12 @@ export default async function BoardPage({
     .select({
       id: game.id,
       sport: game.sport,
-      kickoffAt: game.kickoffAt,
       market: game.market,
+      kickoffAt: game.kickoffAt,
       spread: game.spread,
       totalPoints: game.totalPoints,
       source: game.source,
       sourceBook: game.sourceBook,
-      externalEventId: game.externalEventId,
-      isOnBoard: game.isOnBoard,
       homeTeamId: game.homeTeamId,
       awayTeamId: game.awayTeamId,
       homeName: homeTeam.canonicalName,
@@ -88,92 +73,6 @@ export default async function BoardPage({
     .leftJoin(favoriteTeam, eq(game.favoriteTeamId, favoriteTeam.id))
     .where(eq(game.weekId, weekId))
     .orderBy(asc(game.kickoffAt), asc(game.id));
-
-  const isPublished = weekRow.linesPublishedAt !== null;
-
-  const boundSaveRules = saveRulesAction.bind(null, weekId);
-  const boundPublish = publishBoardAction.bind(null, weekId);
-  const boundSetOverride = setOverrideAction.bind(null, weekId);
-
-  if (isPublished) {
-    const onBoardCount = rows.filter((r) => r.isOnBoard).length;
-    const bySport = new Map<Sport, typeof rows>();
-    for (const sport of SPORT_ORDER) bySport.set(sport, []);
-    for (const row of rows) {
-      bySport.get(row.sport)?.push(row);
-    }
-
-    return (
-      <main className="flex max-w-5xl flex-col gap-3 p-4 sm:p-6">
-<h1>
-          Week {weekRow.number} Board — {weekRow.type}
-        </h1>
-        <p>
-          Published: {ET_DATE_FORMAT.format(weekRow.linesPublishedAt!)} — rules
-          are locked. Only overrides (each writes a ruling) can change what
-          follows.
-        </p>
-        <p className="font-bold">{onBoardCount} game(s) on board</p>
-        {boardSizeWarning(onBoardCount) && (
-          <p className="rounded border border-warning-border bg-warning px-3 py-2 text-warning-fg">{boardSizeWarning(onBoardCount)}</p>
-        )}
-
-        {SPORT_ORDER.map((sport) => {
-          const sportRows = bySport.get(sport) ?? [];
-          if (sportRows.length === 0) return null;
-          return (
-            <section key={sport} className="mb-6">
-              <h2>
-                {sport} ({sportRows.length})
-              </h2>
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b-2 border-border-strong text-left">
-                    <th>Matchup</th>
-                    <th>Kickoff (ET)</th>
-                    <th>Market</th>
-                    <th>Line</th>
-                    <th>Book</th>
-                    <th>On board</th>
-                    <th>Override</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sportRows.map((row) => (
-                    <tr key={row.id} className="border-b border-border">
-                      <td>
-                        {row.awayName} @ {row.homeName}
-                      </td>
-                      <td>{ET_DATE_FORMAT.format(row.kickoffAt)}</td>
-                      <td>{row.market}</td>
-                      <td>{formatLine(row)}</td>
-                      <td>{row.sourceBook ?? "manual"}</td>
-                      <td>{row.isOnBoard ? "yes" : "no"}</td>
-                      <td>
-                        <form action={boundSetOverride.bind(null, row.id, "INCLUDE")} className="inline">
-                          <button type="submit">Force include</button>
-                        </form>{" "}
-                        <form action={boundSetOverride.bind(null, row.id, "EXCLUDE")} className="inline">
-                          <button type="submit">Force exclude</button>
-                        </form>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          );
-        })}
-      </main>
-    );
-  }
-
-  const [config] = await db
-    .select()
-    .from(weekBoardConfig)
-    .where(eq(weekBoardConfig.weekId, weekId))
-    .limit(1);
-  const initialRules = (config?.rules as BoardRule[] | undefined) ?? [];
 
   const overrideRows = await db
     .select({ gameId: boardOverride.gameId, action: boardOverride.action })
@@ -188,101 +87,36 @@ export default async function BoardPage({
   const allTeams = await db
     .select({ id: team.id, sport: team.sport, canonicalName: team.canonicalName })
     .from(team)
+    .where(eq(team.isFixture, false))
     .orderBy(asc(team.canonicalName));
   for (const t of allTeams) teamsBySport[t.sport].push(t);
 
-  const gamesForClient: GameRow[] = rows.map((r) => ({
-    id: r.id,
-    sport: r.sport,
-    market: r.market,
-    kickoffAt: r.kickoffAt,
-    homeTeamId: r.homeTeamId,
-    awayTeamId: r.awayTeamId,
-    source: r.source,
-    homeName: r.homeName,
-    awayName: r.awayName,
-    favoriteName: r.favoriteName,
-    spread: r.spread,
-    totalPoints: r.totalPoints,
-    sourceBook: r.sourceBook,
-  }));
+  const gamesForClient: GameRow[] = rows as GameRow[];
 
   return (
     <main className="flex max-w-5xl flex-col gap-3 p-4 sm:p-6">
-      <h1>
-        Week {weekRow.number} Board — {weekRow.type}
-      </h1>
-      <p>
-        Line snapshot:{" "}
-        {weekRow.lineSnapshotAt ? ET_DATE_FORMAT.format(weekRow.lineSnapshotAt) : "never"}
-        {" · "}
-        {rows.length} snapshot game(s) in the candidate pool. Not published —
-        board membership below is derived from rules, live.
-      </p>
+      <h1 className="text-xl font-semibold">Board Builder</h1>
 
-      <form action={takeSnapshotAction.bind(null, weekId)} className="mb-6">
-        <button type="submit">Take snapshot</button>
-      </form>
-
-      <RulesEditor
-        weekId={weekId}
-        initialRules={initialRules}
-        games={gamesForClient}
-        teamsBySport={teamsBySport}
-        initialOverrides={overrideRows}
-        saveRulesAction={boundSaveRules}
-        publishBoardAction={boundPublish}
-        setOverrideAction={boundSetOverride}
+      <BoardBuilder
+        weeks={weeks}
+        initial={initial}
+        loadWeek={loadWeekBoardAction}
+        setOverride={setOverrideAction}
+        clearOverride={clearOverrideAction}
+        saveSchedule={saveScheduleAction}
+        rulesEditor={
+          <RulesEditor
+            weekId={weekId}
+            initialRules={initial.rules}
+            games={gamesForClient}
+            teamsBySport={teamsBySport}
+            initialOverrides={overrideRows}
+            saveRulesAction={saveRulesAction.bind(null, weekId)}
+            publishBoardAction={publishBoardAction.bind(null, weekId)}
+            setOverrideAction={setOverrideAction.bind(null, weekId)}
+          />
+        }
       />
-
-      <section className="mt-6">
-        <h2>Add a manual game</h2>
-        <form
-          action={createManualGameAction.bind(null, weekId)}
-          className="grid max-w-sm gap-2"
-        >
-          <label>
-            Sport
-            <select name="sport" defaultValue="NCAA">
-              <option value="NFL">NFL</option>
-              <option value="NCAA">NCAA</option>
-              <option value="CFL">CFL</option>
-            </select>
-          </label>
-          <label>
-            Home team
-            <input type="text" name="homeTeamName" required />
-          </label>
-          <label>
-            Away team
-            <input type="text" name="awayTeamName" required />
-          </label>
-          <label>
-            Kickoff
-            <input type="datetime-local" name="kickoffAt" required />
-          </label>
-          <label>
-            Market
-            <select name="market" defaultValue="SPREAD">
-              <option value="SPREAD">SPREAD</option>
-              <option value="TOTAL">TOTAL</option>
-            </select>
-          </label>
-          <label>
-            Favorite team (spread only)
-            <input type="text" name="favoriteTeamName" />
-          </label>
-          <label>
-            Spread
-            <input type="number" step="0.5" name="spread" />
-          </label>
-          <label>
-            Total points
-            <input type="number" step="0.5" name="totalPoints" />
-          </label>
-          <button type="submit">Add game</button>
-        </form>
-      </section>
     </main>
   );
 }
