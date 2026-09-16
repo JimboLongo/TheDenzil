@@ -113,11 +113,15 @@ function GameRow({
       : [totalSide(g, "OVER"), totalSide(g, "UNDER")];
 
   return (
-    <li
-      className={`grid gap-1 border-b border-border py-3 sm:grid-cols-[1fr_20rem] sm:items-center sm:gap-6 ${
-        started ? "opacity-50" : ""
-      }`}
-    >
+    // One layout at every width: header above its buttons. A two-column
+    // grid left the header column stretched to 1fr and a lake of dead
+    // space between it and the buttons on desktop.
+    //
+    // The spacing carries the grouping: 4px from a header to its own
+    // buttons, 12px of padding each side of a game, so the gap within a
+    // game is far smaller than the gap between games and each one reads
+    // as a single unit.
+    <li className={`border-b border-border py-3 ${started ? "opacity-50" : ""}`}>
       <div className="min-w-0">
         <div className="font-medium">
           {g.awayName} @ {g.homeName}
@@ -128,7 +132,7 @@ function GameRow({
         </div>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="mt-1 flex max-w-xl flex-col gap-1">
         {sides.map(({ node, text, value }) => {
           const isSelected = selection === value;
           const isOtherSelected = Boolean(selection) && selection !== value;
