@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { season, week } from "@/db/schema";
 import { rejectUnauthorizedCron } from "@/lib/cron/auth";
+import { ingestSchedule } from "@/lib/odds/ingestSchedule";
 import { takeSnapshot } from "@/lib/odds/snapshotBoard";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,18 @@ export async function GET(request: Request) {
   // has weeks with snapshot times long past — without this the job
   // would "catch up" on all of them and burn odds-API quota re-fetching
   // history that is already final.
+  // Schedule top-up first, every run. /events costs zero quota and only
+  // reaches ~2 weeks ahead, so this has to repeat rather than load once.
+  let schedule: string;
+  try {
+    const ingested = await ingestSchedule();
+    schedule = `${ingested.eventsFetched} events, ${ingested.gamesCreated} new game rows, ${ingested.kickoffsUpdated} kickoffs updated`;
+    console.log(`[cron/snapshot] schedule top-up: ${schedule}`);
+  } catch (error) {
+    schedule = `FAILED: ${(error as Error).message}`;
+    console.error(`[cron/snapshot] schedule top-up ${schedule}`);
+  }
+
   const due = await db
     .select({ id: week.id, number: week.number })
     .from(week)
@@ -55,5 +68,5 @@ export async function GET(request: Request) {
 
   if (due.length === 0) console.log("[cron/snapshot] no weeks due.");
 
-  return NextResponse.json({ ok: true, due: due.length, results });
+  return NextResponse.json({ ok: true, schedule, due: due.length, results });
 }

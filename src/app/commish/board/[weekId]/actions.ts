@@ -11,6 +11,7 @@ import { requireCommish } from "@/lib/auth/getCurrentPlayer";
 import { computeBoard } from "@/lib/board/computeBoard";
 import { publishWeek } from "@/lib/board/publishWeek";
 import type { BoardRule, Market, OverrideAction } from "@/lib/board/rules";
+import { ingestSchedule } from "@/lib/odds/ingestSchedule";
 import { takeSnapshot } from "@/lib/odds/snapshotBoard";
 
 // Every action here re-checks requireCommish() even though Proxy already
@@ -215,6 +216,8 @@ export type BoardGameRow = {
   override: OverrideAction | null;
   /** What was frozen onto the game row at publish time. */
   isOnBoard: boolean;
+  /** No line yet — schedule-ingested but not snapshotted. Shows as TBD. */
+  unpriced: boolean;
 };
 
 export type WeekBoardData = {
@@ -300,6 +303,7 @@ export async function loadWeekBoard(weekId: number): Promise<WeekBoardData> {
       included: includedIds.has(r.id),
       override: overrides.get(r.id) ?? null,
       isOnBoard: r.isOnBoard,
+      unpriced: r.market === "SPREAD" ? r.spread === null : r.totalPoints === null,
     })),
   };
 }
@@ -362,4 +366,23 @@ export async function clearOverrideAction(weekId: number, gameId: number) {
   }
 
   revalidatePath(`/commish/board/${weekId}`);
+}
+
+export type RefreshScheduleResult = { ok: boolean; message: string };
+
+/**
+ * Manual schedule top-up. Costs no API quota, so it can be run freely —
+ * the same ingest the hourly cron performs.
+ */
+export async function refreshScheduleAction(): Promise<RefreshScheduleResult> {
+  await requireCommish();
+  try {
+    const r = await ingestSchedule();
+    return {
+      ok: true,
+      message: `${r.eventsFetched} scheduled events fetched · ${r.gamesCreated} new game rows · ${r.kickoffsUpdated} kickoff(s) updated${r.skippedNoWeek ? ` · ${r.skippedNoWeek} outside any week window` : ""}.`,
+    };
+  } catch (error) {
+    return { ok: false, message: (error as Error).message };
+  }
 }

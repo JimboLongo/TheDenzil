@@ -1,11 +1,20 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { game, week } from "@/db/schema";
+import { game, team, week } from "@/db/schema";
+import { alias } from "drizzle-orm/pg-core";
 import { computeBoard } from "./computeBoard";
+
+const homeTeamAlias = alias(team, "pw_home");
+const awayTeamAlias = alias(team, "pw_away");
 
 export type PublishOutcome =
   | { ok: true; gamesOnBoard: number }
-  | { ok: false; reason: "not-found" | "already-published" | "week-already-open" | "empty-board"; message: string };
+  | { ok: false; reason:
+        | "not-found"
+        | "already-published"
+        | "week-already-open"
+        | "empty-board"
+        | "unpriced-games"; message: string };
 
 /**
  * The one publish path. Both the commissioner's Publish button and the
@@ -69,7 +78,41 @@ export async function publishWeek(weekId: number): Promise<PublishOutcome> {
     };
   }
 
+  // A game with no line is one players cannot pick. Catching it here
+  // means the commissioner finds out Thursday night, not Saturday
+  // morning when nine picks are already due.
   const includedSet = new Set(includedIds);
+  const unpricedOnBoard = await db
+    .select({
+      id: game.id,
+      market: game.market,
+      spread: game.spread,
+      totalPoints: game.totalPoints,
+      homeName: homeTeamAlias.canonicalName,
+      awayName: awayTeamAlias.canonicalName,
+    })
+    .from(game)
+    .innerJoin(homeTeamAlias, eq(game.homeTeamId, homeTeamAlias.id))
+    .innerJoin(awayTeamAlias, eq(game.awayTeamId, awayTeamAlias.id))
+    .where(eq(game.weekId, weekId));
+
+  const blocking = unpricedOnBoard.filter(
+    (g) =>
+      includedSet.has(g.id) &&
+      (g.market === "SPREAD" ? g.spread === null : g.totalPoints === null),
+  );
+
+  if (blocking.length > 0) {
+    const names = blocking
+      .map((g) => `${g.awayName} @ ${g.homeName} (${g.market === "SPREAD" ? "spread" : "total"})`)
+      .join("; ");
+    return {
+      ok: false,
+      reason: "unpriced-games",
+      message: `Week ${weekRow.number} has ${blocking.length} game(s) on the board with no line yet: ${names}. Wait for the snapshot or take these off the board.`,
+    };
+  }
+
   const weekGames = await db.select({ id: game.id }).from(game).where(eq(game.weekId, weekId));
   const onIds = weekGames.filter((g) => includedSet.has(g.id)).map((g) => g.id);
   const offIds = weekGames.filter((g) => !includedSet.has(g.id)).map((g) => g.id);

@@ -28,6 +28,12 @@ function toLocalInput(d: Date | null): string {
 }
 
 function sideLabels(g: BoardGameRow): string[] {
+  // No line yet: show where the number will go rather than inventing one.
+  if (g.unpriced) {
+    return g.market === "TOTAL"
+      ? ["Over TBD", "Under TBD"]
+      : [`${g.awayName} TBD`, `${g.homeName} TBD`];
+  }
   if (g.market === "TOTAL") {
     const t = g.totalPoints ?? "?";
     return [`Over ${t}`, `Under ${t}`];
@@ -56,6 +62,7 @@ export function BoardBuilder({
   setOverride,
   clearOverride,
   saveSchedule,
+  refreshSchedule,
   rulesEditor,
 }: {
   weeks: WeekOption[];
@@ -64,6 +71,7 @@ export function BoardBuilder({
   setOverride: (weekId: number, gameId: number, action: "INCLUDE" | "EXCLUDE") => Promise<void>;
   clearOverride: (weekId: number, gameId: number) => Promise<void>;
   saveSchedule: (weekId: number, snapshotAt: string, publishAt: string) => Promise<ScheduleResult>;
+  refreshSchedule: () => Promise<{ ok: boolean; message: string }>;
   rulesEditor: React.ReactNode;
 }) {
   const [data, setData] = useState<WeekBoardData>(initial);
@@ -72,6 +80,7 @@ export function BoardBuilder({
   const [snapshotAt, setSnapshotAt] = useState(toLocalInput(initial.lineSnapshotAt));
   const [publishAt, setPublishAt] = useState(toLocalInput(initial.publishAt));
   const [scheduleMsg, setScheduleMsg] = useState<ScheduleResult | null>(null);
+  const [refreshMsg, setRefreshMsg] = useState<{ ok: boolean; message: string } | null>(null);
 
   const isPublished = data.linesPublishedAt !== null;
   const includedCount = data.games.filter((g) => (isPublished ? g.isOnBoard : g.included)).length;
@@ -113,27 +122,59 @@ export function BoardBuilder({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Week</span>
-          <select
-            value={data.weekId}
-            disabled={isPending}
-            onChange={(e) => refresh(Number(e.target.value))}
-            className="min-h-10 min-w-56"
-          >
-            {weeks.map((w) => (
-              <option key={w.id} value={w.id}>
-                Week {w.number} — {w.type} ({w.status})
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="text-sm text-text-muted">
-          {includedCount} of {data.games.length} games {isPublished ? "on the published board" : "match the rules"}
-          {isPending && " · loading…"}
-        </p>
+      {/* Horizontal scroller, not a wrap: 18 tabs would eat a phone screen
+          if they wrapped. overflow-x-auto keeps the strip itself scrollable
+          so it cannot push the page sideways. */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div role="tablist" aria-label="Week" className="flex w-max gap-1 border-b border-border">
+          {weeks.map((w) => {
+            const active = w.id === data.weekId;
+            return (
+              <button
+                key={w.id}
+                role="tab"
+                aria-selected={active}
+                disabled={isPending}
+                onClick={() => refresh(w.id)}
+                className={`min-h-10 shrink-0 rounded-t border border-b-0 px-3 py-1 whitespace-nowrap ${
+                  active
+                    ? "border-border bg-surface-raised font-semibold"
+                    : "border-transparent bg-transparent opacity-70 hover:opacity-100"
+                }`}
+              >
+                <span>Wk {w.number}</span>
+                <span className="ml-1 text-xs text-text-muted">{w.status}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-text-muted">
+          Week {data.number} - {data.type} ({data.status}) &middot; {includedCount} of{" "}
+          {data.games.length} games {isPublished ? "on the published board" : "match the rules"}
+          {isPending && " - loading..."}
+        </p>
+        <button
+          type="button"
+          disabled={isPending}
+          className="min-h-9"
+          onClick={() =>
+            startTransition(async () => {
+              setRefreshMsg(await refreshSchedule());
+              setData(await loadWeek(data.weekId));
+            })
+          }
+        >
+          Refresh schedule
+        </button>
+      </div>
+      {refreshMsg && (
+        <p className={`text-sm ${refreshMsg.ok ? "text-success-fg" : "text-danger-fg"}`}>
+          {refreshMsg.message}
+        </p>
+      )}
 
       {isPublished && (
         <p className="rounded border border-info-border bg-info px-3 py-2 text-info-fg">
@@ -212,6 +253,11 @@ export function BoardBuilder({
 
       <section>
         <h2 className="mb-1 font-semibold">Games ({data.games.length})</h2>
+        {data.games.length === 0 && (
+          <p className="rounded border border-warning-border bg-warning px-3 py-2 text-warning-fg">
+            No games yet - the schedule feed only reaches about two weeks ahead.
+          </p>
+        )}
         <ul className="text-sm">
           {data.games.map((g) => {
             const on = isPublished ? g.isOnBoard : g.included;
@@ -251,12 +297,17 @@ export function BoardBuilder({
                     <div className="text-sm text-text-muted">
                       {g.sport} · {g.market === "SPREAD" ? "Spread" : "Total"} ·{" "}
                       {ET_DATE_FORMAT.format(new Date(g.kickoffAt))}
+                      {g.unpriced && " - line not set yet"}
                     </div>
                     <div className={`mt-1 flex max-w-xl flex-col gap-1 ${on ? "" : "opacity-50"}`}>
                       {sideLabels(g).map((label) => (
                         <div
                           key={label}
-                          className="min-h-9 w-full rounded border border-border bg-surface-raised px-3 py-1.5"
+                          className={`min-h-9 w-full rounded border px-3 py-1.5 ${
+                            g.unpriced
+                              ? "border-dashed border-border-strong text-text-muted italic"
+                              : "border-border bg-surface-raised"
+                          }`}
                         >
                           {label}
                         </div>

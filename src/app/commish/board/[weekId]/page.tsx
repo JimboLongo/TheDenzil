@@ -12,6 +12,7 @@ import {
   loadWeekBoardAction,
   publishBoardAction,
   saveRulesAction,
+  refreshScheduleAction,
   saveScheduleAction,
   setOverrideAction,
 } from "./actions";
@@ -104,6 +105,7 @@ export default async function BoardPage({
         setOverride={setOverrideAction}
         clearOverride={clearOverrideAction}
         saveSchedule={saveScheduleAction}
+        refreshSchedule={refreshScheduleAction}
         rulesEditor={
           <RulesEditor
             weekId={weekId}
